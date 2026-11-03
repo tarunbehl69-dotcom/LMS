@@ -33,6 +33,7 @@ import { ProgressCentreView } from './components/ProgressCentreView';
 import { InstructorPortalView } from './components/InstructorPortalView';
 import { AdminPortalView } from './components/AdminPortalView';
 import { MyFilesView } from './components/MyFilesView';
+import { TopicExplorerView } from './components/TopicExplorerView';
 import { DocumentViewerModal } from './components/DocumentViewerModal';
 import { CertificateModal } from './components/CertificateModal';
 
@@ -223,6 +224,21 @@ export const App: React.FC = () => {
             onClaimMission={handleClaimMission}
             onOpenLesson={(courseId) => {
               setCurrentView('knowledge-tower');
+            }}
+          />
+        )}
+
+        {/* Curriculum Galaxy & Topic Atlas (Deep Concept Explorer & Revision Engine) */}
+        {currentView === 'topic-explorer' && (
+          <TopicExplorerView
+            currentUser={currentUser}
+            onAskAi={(prompt) => {
+              sounds.playWarp();
+              setCurrentView('ai-hub');
+            }}
+            onAddXp={async (amount, reason) => {
+              await api.addXp(amount, reason);
+              await loadPlatformData();
             }}
           />
         )}

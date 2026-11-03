@@ -94,10 +94,10 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({
     let width = container.clientWidth || window.innerWidth;
     let height = container.clientHeight || window.innerHeight;
 
-    // 1. Scene & Atmosphere (Dimension 1-3 Space & Dimension 4 Time)
+    // 1. Scene & Deep Space Galaxy Void (Galaxy Theme)
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0A0E13);
-    scene.fog = new THREE.FogExp2(0x0A0E13, 0.012);
+    scene.background = new THREE.Color(0x030712);
+    scene.fog = new THREE.FogExp2(0x030712, 0.009);
 
     // 2. Camera & WebGL2 Renderer (Photoreal Configuration)
     const camera = new THREE.PerspectiveCamera(52, width / height, 0.1, 1000);
@@ -358,6 +358,66 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({
       buildingMeshes.push({ spec: b, group: bGroup, beacon });
     });
 
+    // 5.1 Celestial Constellation Network (Galaxy Theme)
+    // Connects the 7 buildings in the sky like an orbital star constellation
+    const constellationPoints: THREE.Vector3[] = [];
+    BUILDINGS.forEach((b) => {
+      const bx = Math.sin(b.angle) * b.distance;
+      const bz = Math.cos(b.angle) * b.distance;
+      const by = 16 + (b.id === 'knowledge-tower' ? 12 : 4);
+      constellationPoints.push(new THREE.Vector3(bx, by, bz));
+    });
+    // Loop back to first building
+    constellationPoints.push(constellationPoints[0]);
+
+    const constellationGeo = new THREE.BufferGeometry().setFromPoints(constellationPoints);
+    const constellationMat = new THREE.LineBasicMaterial({
+      color: 0x38BDF8,
+      transparent: true,
+      opacity: 0.35
+    });
+    const constellationLines = new THREE.Line(constellationGeo, constellationMat);
+    scene.add(constellationLines);
+
+    // 5.2 Deep Galaxy 1,500-Star Twinkling Starfield & Cosmic Nebulae
+    const starCount = 1500;
+    const starGeo = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
+    for (let s = 0; s < starCount; s++) {
+      const sRadius = 45 + Math.random() * 120;
+      const sTheta = Math.random() * Math.PI * 2;
+      const sPhi = Math.random() * Math.PI * 0.45; // Upper celestial dome
+
+      starPositions[s * 3] = sRadius * Math.sin(sPhi) * Math.cos(sTheta);
+      starPositions[s * 3 + 1] = 8 + sRadius * Math.cos(sPhi);
+      starPositions[s * 3 + 2] = sRadius * Math.sin(sPhi) * Math.sin(sTheta);
+
+      // Star Color: Stellar Cyan (30%), Cosmic Purple (35%), Supernova White (35%)
+      const randColor = Math.random();
+      if (randColor < 0.3) {
+        starColors[s * 3] = 0.22; starColors[s * 3 + 1] = 0.74; starColors[s * 3 + 2] = 0.97; // Cyan #38BDF8
+      } else if (randColor < 0.65) {
+        starColors[s * 3] = 0.65; starColors[s * 3 + 1] = 0.33; starColors[s * 3 + 2] = 0.96; // Purple #A855F7
+      } else {
+        starColors[s * 3] = 0.95; starColors[s * 3 + 1] = 0.95; starColors[s * 3 + 2] = 1.0; // White
+      }
+    }
+
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    const starMat = new THREE.PointsMaterial({
+      size: 0.65,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    const galaxyStars = new THREE.Points(starGeo, starMat);
+    scene.add(galaxyStars);
+
     // 6. City Life Simulation: Outer Maglev Tram & Rooftop Delivery Drone
     const tramTrackRadius = 50;
     const tramGeo = new THREE.BoxGeometry(2.5, 1.6, 5);
@@ -483,6 +543,10 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({
       // Rotate Infinity Sculpture & Holo Ring
       loopMesh.rotation.y += 0.012;
       holoRing.rotation.z += 0.008;
+
+      // Celestial Galaxy Starfield Slow Rotation (Galaxy Theme)
+      galaxyStars.rotation.y += 0.0003;
+      constellationLines.rotation.y += 0.0003;
 
       // Animate Maglev Tram around Plaza Loop
       const tramAngle = time * 0.25;

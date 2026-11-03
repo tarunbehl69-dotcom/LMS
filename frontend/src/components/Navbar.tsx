@@ -18,7 +18,8 @@ import {
   Sparkles,
   Flame,
   CheckCircle2,
-  Folder
+  Folder,
+  Atom
 } from 'lucide-react';
 import { sounds } from '../services/soundEffects';
 
@@ -92,12 +93,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => handleNavClick('dashboard')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
             currentView === 'dashboard'
-              ? 'bg-[#2EC4B6]/20 text-[#2EC4B6] border border-[#2EC4B6]/40 shadow-[0_0_12px_rgba(46,196,182,0.2)]'
-              : 'text-[#9AA7B2] hover:text-[#2EC4B6] hover:bg-white/5'
+              ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40 shadow-[0_0_12px_rgba(56,189,248,0.25)]'
+              : 'text-[#94A3B8] hover:text-[#38BDF8] hover:bg-white/5'
           }`}
         >
-          <LayoutDashboard className="w-4 h-4 text-[#F2A541]" strokeWidth={1.5} />
+          <LayoutDashboard className="w-4 h-4 text-[#FBBF24]" strokeWidth={1.5} />
           <span>Dashboard</span>
+        </button>
+
+        {/* Topic Atlas - Deep Concept Explorer & Study Engine */}
+        <button
+          onClick={() => handleNavClick('topic-explorer')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'topic-explorer'
+              ? 'bg-[#A855F7]/25 text-[#C084FC] border border-[#A855F7]/50 shadow-[0_0_15px_rgba(168,85,247,0.35)]'
+              : 'text-[#94A3B8] hover:text-[#C084FC] hover:bg-white/5'
+          }`}
+        >
+          <Atom className="w-4 h-4 text-[#C084FC]" strokeWidth={1.5} />
+          <span>Topic Atlas</span>
         </button>
 
         <button

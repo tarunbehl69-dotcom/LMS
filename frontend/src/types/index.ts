@@ -15,6 +15,7 @@ export type AppView =
   | 'landing'
   | 'explore-3d'
   | 'dashboard'
+  | 'topic-explorer'
   | 'knowledge-tower'
   | 'ai-hub'
   | 'challenge-arena'
@@ -25,6 +26,32 @@ export type AppView =
   | 'my-files'
   | 'instructor-portal'
   | 'admin-portal';
+
+export interface TopicFlashcard {
+  question: string;
+  answer: string;
+}
+
+export interface TopicDiagnosticQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface TopicConcept {
+  id: string;
+  title: string;
+  category: string;
+  summary: string;
+  difficulty: 'Foundation' | 'Core' | 'Advanced';
+  estimatedMinutes: number;
+  keyTakeaways: string[];
+  formulaOrRule?: string;
+  flashcards: TopicFlashcard[];
+  diagnosticQuiz: TopicDiagnosticQuestion[];
+  masteryStatus: 'unstarted' | 'learning' | 'mastered';
+}
 
 export type BuildingId = 
   | 'knowledge-tower'

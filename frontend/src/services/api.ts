@@ -608,6 +608,20 @@ export const api = {
     );
   },
 
+  addXp: async (amount: number, reason: string) => {
+    localLms.addXP(amount, reason);
+    try {
+      await fetch('http://localhost:8000/api/gamification/award', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 'usr_student_1', amount, reason })
+      });
+    } catch (e) {
+      // Fallback local store already recorded XP
+    }
+    return { status: 'success' };
+  },
+
   getAuditLogs: async () => {
     return safeFetch(
       `/admin/audit-logs`,
