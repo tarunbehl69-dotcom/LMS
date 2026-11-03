@@ -32,6 +32,8 @@ import { CollaborationCentreView } from './components/CollaborationCentreView';
 import { ProgressCentreView } from './components/ProgressCentreView';
 import { InstructorPortalView } from './components/InstructorPortalView';
 import { AdminPortalView } from './components/AdminPortalView';
+import { MyFilesView } from './components/MyFilesView';
+import { DocumentViewerModal } from './components/DocumentViewerModal';
 import { CertificateModal } from './components/CertificateModal';
 
 export const App: React.FC = () => {
@@ -48,6 +50,9 @@ export const App: React.FC = () => {
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [missions, setMissions] = useState<DailyMission[]>([]);
   const [xpTransactions, setXpTransactions] = useState<XPTransaction[]>([]);
+
+  // Document Viewer Modal State
+  const [activeViewerDoc, setActiveViewerDoc] = useState<LibraryResource | null>(null);
 
   // Certificate Modal State
   const [certificateData, setCertificateData] = useState<{ courseTitle: string; certId: string } | null>(null);
@@ -178,7 +183,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0A0E13] text-[#EEF2F5] flex flex-col font-sans selection:bg-[#2EC4B6] selection:text-[#0A0E13]">
       {/* Top Futuristic Navigation Bar (Present across all views except landing hero) */}
       <Navbar
         currentView={currentView}
@@ -196,10 +201,15 @@ export const App: React.FC = () => {
           />
         )}
 
+        {/* Dimension 1-3: Space / Dimension 4: Time / Dimension 5: Knowledge */}
         {currentView === 'explore-3d' && (
           <ThreeCityScene
             onEnterBuilding={handleEnterBuilding}
             onSwitchToDashboard={() => setCurrentView('dashboard')}
+            onOpenUploadTerminal={() => setCurrentView('my-files')}
+            completedModulesCount={courses[0]?.modules?.filter(m => m.lessons.every(l => l.is_completed)).length || 2}
+            nextDeadline={{ title: "Quantum Computing Midterm", date: "Friday 23:59" }}
+            recentDocThumbnails={resources.slice(0, 8).map(r => r.cover_image)}
           />
         )}
 
@@ -235,6 +245,16 @@ export const App: React.FC = () => {
             resources={resources}
             onToggleBookmark={handleToggleBookmark}
             onRefreshData={loadPlatformData}
+          />
+        )}
+
+        {/* Section 7.1: My Files Central Document Manager */}
+        {currentView === 'my-files' && (
+          <MyFilesView
+            currentUser={currentUser}
+            resources={resources}
+            onRefreshData={loadPlatformData}
+            onOpenViewer={(res) => setActiveViewerDoc(res)}
           />
         )}
 
@@ -274,6 +294,17 @@ export const App: React.FC = () => {
           <AdminPortalView currentUser={currentUser} />
         )}
       </main>
+
+      {/* Built-in Presentation Slide & PDF Document Viewer Modal */}
+      {activeViewerDoc && (
+        <DocumentViewerModal
+          resource={activeViewerDoc}
+          onClose={() => setActiveViewerDoc(null)}
+          onAskAi={(prompt) => {
+            setCurrentView('ai-hub');
+          }}
+        />
+      )}
 
       {/* Verifiable Certificate Modal */}
       {certificateData && (

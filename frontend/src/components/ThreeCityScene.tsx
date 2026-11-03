@@ -1,12 +1,36 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { BuildingId } from '../types';
-import { Compass, Eye, MapPin, Maximize2, Move, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
+import { BuildingId, TimeOfDay, WeatherCondition } from '../types';
+import { 
+  Compass, 
+  Eye, 
+  MapPin, 
+  Maximize2, 
+  Move, 
+  Volume2, 
+  VolumeX, 
+  Zap, 
+  Clock, 
+  Sun, 
+  Moon, 
+  CloudRain, 
+  HelpCircle, 
+  Navigation,
+  FileUp,
+  Layers,
+  Award,
+  ChevronRight,
+  X
+} from 'lucide-react';
 import { sounds } from '../services/soundEffects';
 
 interface ThreeCitySceneProps {
   onEnterBuilding: (buildingId: BuildingId) => void;
   onSwitchToDashboard: () => void;
+  onOpenUploadTerminal?: () => void;
+  completedModulesCount?: number;
+  nextDeadline?: { title: string; date: string };
+  recentDocThumbnails?: string[];
 }
 
 interface BuildingSpec {
@@ -17,34 +41,51 @@ interface BuildingSpec {
   distance: number;
   color: number;
   accentColor: number;
-  icon: string;
+  description: string;
 }
 
 const BUILDINGS: BuildingSpec[] = [
-  { id: 'knowledge-tower', name: 'Knowledge Tower', category: 'Core LMS & Courses', angle: 0, distance: 32, color: 0x00F0FF, accentColor: 0x3B82F6, icon: '🏛️' },
-  { id: 'ai-hub', name: 'AI Innovation Hub', category: 'Gemini Academic Mentor', angle: (Math.PI * 2) * (1 / 7), distance: 34, color: 0x8B5CF6, accentColor: 0xC084FC, icon: '🧠' },
-  { id: 'challenge-arena', name: 'Challenge Arena', category: 'Quizzes & Competitions', angle: (Math.PI * 2) * (2 / 7), distance: 32, color: 0xF59E0B, accentColor: 0xEF4444, icon: '⚔️' },
-  { id: 'digital-library', name: 'Digital Library', category: 'Research Archive & E-Books', angle: (Math.PI * 2) * (3 / 7), distance: 33, color: 0x10B981, accentColor: 0x06B6D4, icon: '📚' },
-  { id: 'experiment-lab', name: 'Experiment Lab', category: 'Interactive Simulations', angle: (Math.PI * 2) * (4 / 7), distance: 34, color: 0xEC4899, accentColor: 0x8B5CF6, icon: '🔬' },
-  { id: 'collaboration-centre', name: 'Collaboration Centre', category: 'Study Squads & Forums', angle: (Math.PI * 2) * (5 / 7), distance: 32, color: 0x3B82F6, accentColor: 0x60A5FA, icon: '🤝' },
-  { id: 'progress-centre', name: 'Progress Centre', category: 'XP, Levels & Analytics', angle: (Math.PI * 2) * (6 / 7), distance: 33, color: 0x06B6D4, accentColor: 0x14B8A6, icon: '🏆' }
+  { id: 'knowledge-tower', name: 'Knowledge Tower', category: 'Main Academic Learning Centre', angle: 0, distance: 34, color: 0x2EC4B6, accentColor: 0xF2A541, description: '160m parametric ceramic tower. Course modules, slide decks & lectures.' },
+  { id: 'ai-hub', name: 'AI Innovation Hub', category: 'AI Personal Learning Centre', angle: (Math.PI * 2) * (1 / 7), distance: 35, color: 0x2EC4B6, accentColor: 0x3EE1D2, description: '45m gridshell dome with suspended light core. Gemini-grounded mentorship.' },
+  { id: 'challenge-arena', name: 'Challenge Arena', category: 'Testing & Competitions', angle: (Math.PI * 2) * (2 / 7), distance: 34, color: 0xF2A541, accentColor: 0xFF6B5E, description: 'Cantilevered arena with LED mesh skin displaying real weekly leaderboard.' },
+  { id: 'digital-library', name: 'Digital Library', category: 'Central Academic Resource Repository', angle: (Math.PI * 2) * (3 / 7), distance: 35, color: 0x7BD389, accentColor: 0x2EC4B6, description: 'Terraced timber architecture with vertical Archive Wall showing real documents.' },
+  { id: 'experiment-lab', name: 'Experiment Lab', category: 'Practical & Experiential Learning', angle: (Math.PI * 2) * (4 / 7), distance: 35, color: 0xF2A541, accentColor: 0x2EC4B6, description: 'Hexagonal modular pods with active simulation reactors and case studies.' },
+  { id: 'collaboration-centre', name: 'Collaboration Centre', category: 'Social & Collaborative Learning', angle: (Math.PI * 2) * (5 / 7), distance: 34, color: 0x2EC4B6, accentColor: 0xF2A541, description: 'Tiered amphitheatre with suspended skywalks and study group lanterns.' },
+  { id: 'progress-centre', name: 'Progress Centre', category: 'Personal Performance & Analytics', angle: (Math.PI * 2) * (6 / 7), distance: 35, color: 0x2EC4B6, accentColor: 0x7BD389, description: 'Astronomical observatory telescope pointing at your personal achievement star constellation.' }
 ];
 
-export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding, onSwitchToDashboard }) => {
+export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ 
+  onEnterBuilding, 
+  onSwitchToDashboard,
+  onOpenUploadTerminal,
+  completedModulesCount = 3,
+  nextDeadline = { title: "Quantum Neuromorphic Midterm", date: "Friday 23:59" },
+  recentDocThumbnails = []
+}) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  
+  // HUD and Interaction State
   const [activeNearbyBuilding, setActiveNearbyBuilding] = useState<BuildingSpec | null>(null);
-  const [isAerialView, setIsAerialView] = useState<boolean>(false);
-  const [playerCoord, setPlayerCoord] = useState<{ x: number; z: number; rot: number }>({ x: 0, z: 0, rot: 0 });
+  const [isNearKiosk, setIsNearKiosk] = useState<boolean>(false);
+  const [isMapMode, setIsMapMode] = useState<boolean>(false);
+  const [playerCoord, setPlayerCoord] = useState<{ x: number; z: number; rot: number }>({ x: 0, z: 8, rot: 0 });
   const [isMuted, setIsMuted] = useState<boolean>(sounds.getIsMuted());
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
+  const [showQuickTravel, setShowQuickTravel] = useState<boolean>(false);
 
-  // Input State Refs for smooth 60fps game loop
+  // Dimension 4: Time of Day & Weather State
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('blue_hour');
+  const [isTimeLapse, setIsTimeLapse] = useState<boolean>(false);
+  const [weather, setWeather] = useState<WeatherCondition>('clear');
+
+  // Input State Refs
   const keysRef = useRef<{ [key: string]: boolean }>({});
   const joystickRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const isDraggingCameraRef = useRef<boolean>(false);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const cameraAngleRef = useRef<{ theta: number; phi: number; distance: number }>({ theta: 0, phi: 0.35, distance: 18 });
-  const isAerialRef = useRef<boolean>(false);
-  isAerialRef.current = isAerialView;
+  const cameraAngleRef = useRef<{ theta: number; phi: number; distance: number }>({ theta: 0, phi: 0.38, distance: 16 });
+  const isMapModeRef = useRef<boolean>(false);
+  isMapModeRef.current = isMapMode;
 
   useEffect(() => {
     const container = mountRef.current;
@@ -53,89 +94,108 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
     let width = container.clientWidth || window.innerWidth;
     let height = container.clientHeight || window.innerHeight;
 
-    // 1. Scene & Environment
+    // 1. Scene & Atmosphere (Dimension 1-3 Space & Dimension 4 Time)
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050B14);
-    scene.fog = new THREE.FogExp2(0x050B14, 0.015);
+    scene.background = new THREE.Color(0x0A0E13);
+    scene.fog = new THREE.FogExp2(0x0A0E13, 0.012);
 
-    // 2. Camera & Renderer
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+    // 2. Camera & WebGL2 Renderer (Photoreal Configuration)
+    const camera = new THREE.PerspectiveCamera(52, width / height, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;
+    renderer.toneMappingExposure = 1.15;
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // 3. Ambient & Directional Lighting
-    const ambientLight = new THREE.AmbientLight(0x0E172A, 1.2);
+    // 3. Dynamic Physical Lighting (Dimension 4 Time)
+    const ambientLight = new THREE.AmbientLight(0x1C2A33, 1.4);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0x00F0FF, 1.5);
-    dirLight.position.set(30, 60, 40);
-    scene.add(dirLight);
+    // Sun directional light with cascaded soft shadows
+    const sunLight = new THREE.DirectionalLight(0xF2A541, 1.8);
+    sunLight.position.set(45, 75, 45);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.bias = -0.0001;
+    scene.add(sunLight);
 
-    const purpleLight = new THREE.DirectionalLight(0x8B5CF6, 1.2);
-    purpleLight.position.set(-30, 40, -40);
-    scene.add(purpleLight);
+    // Cool skylight fill
+    const skyFillLight = new THREE.DirectionalLight(0x2EC4B6, 1.1);
+    skyFillLight.position.set(-45, 50, -45);
+    scene.add(skyFillLight);
 
-    // Central Plaza Energy Fountain
-    const centralBeacon = new THREE.PointLight(0x00F0FF, 3, 40);
-    centralBeacon.position.set(0, 10, 0);
-    scene.add(centralBeacon);
-
-    // 4. Ground Plaza with Cyber Grid
-    const groundGeo = new THREE.CircleGeometry(65, 64);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x070D1B,
-      roughness: 0.6,
-      metalness: 0.8
+    // 4. Central Infinity Plaza (120m Circular Granite & Water Mirror)
+    const plazaRadius = 60;
+    const plazaGeo = new THREE.CircleGeometry(plazaRadius, 64);
+    const plazaMat = new THREE.MeshStandardMaterial({
+      color: 0x0D141C,
+      roughness: 0.35,
+      metalness: 0.75
     });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    const plaza = new THREE.Mesh(plazaGeo, plazaMat);
+    plaza.rotation.x = -Math.PI / 2;
+    plaza.receiveShadow = true;
+    scene.add(plaza);
 
-    // Plaza Concentric Cyber Rings
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00F0FF, transparent: true, opacity: 0.25, wireframe: true });
-    for (let r = 10; r <= 55; r += 12) {
-      const ringGeo = new THREE.RingGeometry(r - 0.2, r + 0.2, 64);
-      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-      ringMesh.rotation.x = -Math.PI / 2;
-      ringMesh.position.y = 0.05;
-      scene.add(ringMesh);
-    }
-
-    // Grid Floor
-    const gridHelper = new THREE.GridHelper(120, 60, 0x00F0FF, 0x1E293B);
-    gridHelper.position.y = 0.02;
-    (gridHelper.material as THREE.Material).transparent = true;
-    (gridHelper.material as THREE.Material).opacity = 0.25;
-    scene.add(gridHelper);
-
-    // Central Plaza Monument
-    const monumentGeo = new THREE.CylinderGeometry(2, 4, 1.5, 16);
-    const monumentMat = new THREE.MeshStandardMaterial({ color: 0x0E172A, metalness: 0.9, roughness: 0.2 });
-    const monument = new THREE.Mesh(monumentGeo, monumentMat);
-    monument.position.y = 0.75;
-    scene.add(monument);
-
-    // Central Hologram Crystal
-    const crystalGeo = new THREE.OctahedronGeometry(1.8, 0);
-    const crystalMat = new THREE.MeshStandardMaterial({
-      color: 0x00F0FF,
-      emissive: 0x00F0FF,
-      emissiveIntensity: 0.6,
-      wireframe: true
+    // Water Mirror Basin in Plaza Center
+    const waterGeo = new THREE.CircleGeometry(16, 48);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x0A1822,
+      roughness: 0.08,
+      metalness: 0.95,
+      transparent: true,
+      opacity: 0.88
     });
-    const centralCrystal = new THREE.Mesh(crystalGeo, crystalMat);
-    centralCrystal.position.set(0, 5, 0);
-    scene.add(centralCrystal);
+    const waterMirror = new THREE.Mesh(waterGeo, waterMat);
+    waterMirror.rotation.x = -Math.PI / 2;
+    waterMirror.position.y = 0.04;
+    scene.add(waterMirror);
 
-    // 5. Build Seven University Buildings
-    const buildingMeshes: { spec: BuildingSpec; mesh: THREE.Group; enterPos: THREE.Vector3 }[] = [];
+    // Central Brand Mark: The "Loop" (Rotating Infinity Sculpture)
+    const loopCurve = new THREE.TorusGeometry(3.5, 0.45, 24, 64);
+    const loopMat = new THREE.MeshStandardMaterial({
+      color: 0xDCD8CF,
+      metalness: 0.9,
+      roughness: 0.15,
+      emissive: 0x2EC4B6,
+      emissiveIntensity: 0.35
+    });
+    const loopMesh = new THREE.Mesh(loopCurve, loopMat);
+    loopMesh.rotation.x = Math.PI / 3;
+    loopMesh.position.set(0, 4.5, 0);
+    scene.add(loopMesh);
+
+    // Plaza Hologram: Live Next Academic Deadline (Dimension 5)
+    const holoRingGeo = new THREE.RingGeometry(2.5, 3.2, 32);
+    const holoRingMat = new THREE.MeshBasicMaterial({ color: 0xF2A541, side: THREE.DoubleSide, transparent: true, opacity: 0.45 });
+    const holoRing = new THREE.Mesh(holoRingGeo, holoRingMat);
+    holoRing.rotation.x = -Math.PI / 2;
+    holoRing.position.y = 0.06;
+    scene.add(holoRing);
+
+    // Upload Terminal Kiosk in Plaza (Section 7.9)
+    const kioskGroup = new THREE.Group();
+    kioskGroup.position.set(4, 0, 5);
+    const kioskBaseGeo = new THREE.BoxGeometry(1.2, 2.2, 0.8);
+    const kioskBaseMat = new THREE.MeshStandardMaterial({ color: 0x111821, metalness: 0.8, roughness: 0.2 });
+    const kioskBase = new THREE.Mesh(kioskBaseGeo, kioskBaseMat);
+    kioskBase.position.y = 1.1;
+    kioskGroup.add(kioskBase);
+
+    const kioskScreenGeo = new THREE.PlaneGeometry(0.9, 0.7);
+    const kioskScreenMat = new THREE.MeshBasicMaterial({ color: 0x2EC4B6 });
+    const kioskScreen = new THREE.Mesh(kioskScreenGeo, kioskScreenMat);
+    kioskScreen.position.set(0, 1.4, 0.41);
+    kioskGroup.add(kioskScreen);
+    scene.add(kioskGroup);
+
+    // 5. Seven True-Scale Architecture Buildings
+    const buildingMeshes: { spec: BuildingSpec; group: THREE.Group; beacon: THREE.Mesh }[] = [];
 
     BUILDINGS.forEach((b) => {
       const bGroup = new THREE.Group();
@@ -143,225 +203,224 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
       const bz = Math.cos(b.angle) * b.distance;
       bGroup.position.set(bx, 0, bz);
 
-      // Unique Architecture based on building ID
       if (b.id === 'knowledge-tower') {
-        // High cyber skyscraper with tiers and beacon
-        const baseGeo = new THREE.CylinderGeometry(5, 7, 6, 8);
-        const baseMat = new THREE.MeshStandardMaterial({ color: 0x0B192C, roughness: 0.3, metalness: 0.8 });
-        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-        baseMesh.position.y = 3;
-        bGroup.add(baseMesh);
+        // 160m Twisting Tower with Ceramic Fins (Building 1)
+        const towerBaseGeo = new THREE.CylinderGeometry(5.5, 7.5, 12, 16);
+        const ceramicMat = new THREE.MeshStandardMaterial({ color: 0xDCD8CF, roughness: 0.25, metalness: 0.6 });
+        const towerBase = new THREE.Mesh(towerBaseGeo, ceramicMat);
+        towerBase.position.y = 6;
+        bGroup.add(towerBase);
 
-        const midGeo = new THREE.CylinderGeometry(3.5, 4.5, 14, 8);
-        const midMesh = new THREE.Mesh(midGeo, baseMat);
-        midMesh.position.y = 13;
-        bGroup.add(midMesh);
+        const towerBodyGeo = new THREE.CylinderGeometry(3.8, 5.2, 28, 16);
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x1C2A33, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.9 });
+        const towerBody = new THREE.Mesh(towerBodyGeo, glassMat);
+        towerBody.position.y = 26;
+        bGroup.add(towerBody);
 
-        const spireGeo = new THREE.ConeGeometry(2.5, 12, 8);
-        const spireMat = new THREE.MeshStandardMaterial({ color: 0x00F0FF, emissive: 0x00F0FF, emissiveIntensity: 0.4 });
-        const spire = new THREE.Mesh(spireGeo, spireMat);
-        spire.position.y = 26;
-        bGroup.add(spire);
+        // Dimension 5: Facade Progress Bands (Light up as learner completes modules)
+        for (let band = 0; band < 5; band++) {
+          const isCompleted = band < completedModulesCount;
+          const bandGeo = new THREE.TorusGeometry(4.8 - band * 0.25, 0.15, 16, 32);
+          const bandMat = new THREE.MeshStandardMaterial({
+            color: isCompleted ? 0xF2A541 : 0x334155,
+            emissive: isCompleted ? 0xF2A541 : 0x000000,
+            emissiveIntensity: isCompleted ? 0.8 : 0.0
+          });
+          const bandMesh = new THREE.Mesh(bandGeo, bandMat);
+          bandMesh.rotation.x = Math.PI / 2;
+          bandMesh.position.y = 14 + band * 4.5;
+          bGroup.add(bandMesh);
+        }
 
-        // Holographic Rings
-        const ringGeo = new THREE.TorusGeometry(5.5, 0.15, 16, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00F0FF, wireframe: true });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.y = 18;
-        bGroup.add(ring);
+        // Amber Crown Halo at Night
+        const crownGeo = new THREE.TorusGeometry(3.5, 0.35, 16, 32);
+        const crownMat = new THREE.MeshStandardMaterial({ color: 0xF2A541, emissive: 0xF2A541, emissiveIntensity: 0.9 });
+        const crown = new THREE.Mesh(crownGeo, crownMat);
+        crown.rotation.x = Math.PI / 2;
+        crown.position.y = 41;
+        bGroup.add(crown);
       } else if (b.id === 'ai-hub') {
-        // Geodesic neural sphere
-        const domeGeo = new THREE.IcosahedronGeometry(7, 2);
+        // 45m Gridshell Dome of Triangulated Glass (Building 2)
+        const domeGeo = new THREE.IcosahedronGeometry(8.5, 2);
         const domeMat = new THREE.MeshStandardMaterial({
-          color: 0x1E1B4B,
-          emissive: 0x8B5CF6,
-          emissiveIntensity: 0.3,
+          color: 0x111821,
+          emissive: 0x2EC4B6,
+          emissiveIntensity: 0.25,
           wireframe: true,
-          metalness: 0.9
+          metalness: 0.8
         });
         const dome = new THREE.Mesh(domeGeo, domeMat);
-        dome.position.y = 5.5;
+        dome.position.y = 6.5;
         bGroup.add(dome);
 
-        // Core plasma orb
-        const coreGeo = new THREE.SphereGeometry(3.5, 32, 32);
-        const coreMat = new THREE.MeshStandardMaterial({ color: 0x8B5CF6, emissive: 0xC084FC, emissiveIntensity: 0.8, roughness: 0.1 });
+        // Suspended Core Light Strands
+        const coreGeo = new THREE.SphereGeometry(4, 32, 32);
+        const coreMat = new THREE.MeshStandardMaterial({ color: 0x2EC4B6, emissive: 0x3EE1D2, emissiveIntensity: 0.75, roughness: 0.15 });
         const core = new THREE.Mesh(coreGeo, coreMat);
-        core.position.y = 5.5;
+        core.position.y = 6.5;
         bGroup.add(core);
       } else if (b.id === 'challenge-arena') {
-        // Octagonal colosseum with glowing pillars
-        const arenaGeo = new THREE.CylinderGeometry(8, 9, 7, 8, 1, true);
-        const arenaMat = new THREE.MeshStandardMaterial({ color: 0x1F2937, metalness: 0.8, roughness: 0.4, side: THREE.DoubleSide });
-        const arenaMesh = new THREE.Mesh(arenaGeo, arenaMat);
-        arenaMesh.position.y = 3.5;
-        bGroup.add(arenaMesh);
+        // Oval Arena with Cantilevered Roof & LED Mesh (Building 3)
+        const arenaGeo = new THREE.CylinderGeometry(9, 10.5, 8, 16, 1, true);
+        const arenaMat = new THREE.MeshStandardMaterial({ color: 0x1F2937, metalness: 0.85, roughness: 0.3, side: THREE.DoubleSide });
+        const arena = new THREE.Mesh(arenaGeo, arenaMat);
+        arena.position.y = 4;
+        bGroup.add(arena);
 
-        // 8 Energy Pylons
-        for (let p = 0; p < 8; p++) {
-          const pAngle = (p / 8) * Math.PI * 2;
-          const pylonGeo = new THREE.BoxGeometry(0.8, 12, 0.8);
-          const pylonMat = new THREE.MeshStandardMaterial({ color: 0xF59E0B, emissive: 0xF59E0B, emissiveIntensity: 0.6 });
-          const pylon = new THREE.Mesh(pylonGeo, pylonMat);
-          pylon.position.set(Math.sin(pAngle) * 8.5, 6, Math.cos(pAngle) * 8.5);
-          bGroup.add(pylon);
-        }
+        // LED Mesh Screen Ring
+        const ledGeo = new THREE.TorusGeometry(10.2, 0.35, 16, 48);
+        const ledMat = new THREE.MeshStandardMaterial({ color: 0xF2A541, emissive: 0xF2A541, emissiveIntensity: 0.8 });
+        const ledRing = new THREE.Mesh(ledGeo, ledMat);
+        ledRing.rotation.x = Math.PI / 2;
+        ledRing.position.y = 7.5;
+        bGroup.add(ledRing);
       } else if (b.id === 'digital-library') {
-        // Hypercube matrix with floating data blocks
-        const libGeo = new THREE.BoxGeometry(11, 10, 11);
-        const libMat = new THREE.MeshStandardMaterial({ color: 0x064E3B, metalness: 0.7, roughness: 0.3, transparent: true, opacity: 0.85 });
-        const libMesh = new THREE.Mesh(libGeo, libMat);
-        libMesh.position.y = 5;
-        bGroup.add(libMesh);
+        // Terraced Timber Stack with Vertical Archive Wall (Building 4)
+        const libBaseGeo = new THREE.BoxGeometry(14, 8, 12);
+        const timberMat = new THREE.MeshStandardMaterial({ color: 0x3F2E23, roughness: 0.8, metalness: 0.1 });
+        const libBase = new THREE.Mesh(libBaseGeo, timberMat);
+        libBase.position.y = 4;
+        bGroup.add(libBase);
 
-        // Emerald Wireframe shell
-        const shellGeo = new THREE.BoxGeometry(12.5, 11.5, 12.5);
-        const shellMat = new THREE.MeshBasicMaterial({ color: 0x10B981, wireframe: true });
-        const shell = new THREE.Mesh(shellGeo, shellMat);
-        shell.position.y = 5;
-        bGroup.add(shell);
+        // Vertical Archive Wall (Dimension 5: shows document tiles)
+        const archiveWallGeo = new THREE.PlaneGeometry(10, 6);
+        const archiveWallMat = new THREE.MeshStandardMaterial({ color: 0x7BD389, emissive: 0x7BD389, emissiveIntensity: 0.45 });
+        const archiveWall = new THREE.Mesh(archiveWallGeo, archiveWallMat);
+        archiveWall.position.set(0, 4.5, 6.05);
+        bGroup.add(archiveWall);
       } else if (b.id === 'experiment-lab') {
-        // High-tech modular facility with cylindrical reactors
-        const mainGeo = new THREE.BoxGeometry(12, 6, 10);
-        const mainMat = new THREE.MeshStandardMaterial({ color: 0x1E1B4B, metalness: 0.8, roughness: 0.3 });
-        const mainMesh = new THREE.Mesh(mainGeo, mainMat);
-        mainMesh.position.y = 3;
-        bGroup.add(mainMesh);
+        // Hexagonal Modular Pods Linked by Glass Skybridges (Building 5)
+        const podGeo = new THREE.CylinderGeometry(4.5, 4.5, 7, 6);
+        const podMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, metalness: 0.8, roughness: 0.25 });
+        const pod1 = new THREE.Mesh(podGeo, podMat);
+        pod1.position.set(-4, 3.5, 0);
+        bGroup.add(pod1);
 
-        // Reactor chambers
-        const r1Geo = new THREE.CylinderGeometry(3, 3, 10, 16);
-        const rMat = new THREE.MeshStandardMaterial({ color: 0xEC4899, emissive: 0xEC4899, emissiveIntensity: 0.4, wireframe: true });
-        const r1 = new THREE.Mesh(r1Geo, rMat);
-        r1.position.set(-4, 5, 0);
-        bGroup.add(r1);
-        const r2 = new THREE.Mesh(r1Geo, rMat);
-        r2.position.set(4, 5, 0);
-        bGroup.add(r2);
+        const pod2 = new THREE.Mesh(podGeo, podMat);
+        pod2.position.set(4, 3.5, 0);
+        bGroup.add(pod2);
+
+        // Active Simulation Glowing Reactor
+        const reactorGeo = new THREE.SphereGeometry(2.2, 24, 24);
+        const reactorMat = new THREE.MeshStandardMaterial({ color: 0xF2A541, emissive: 0xF2A541, emissiveIntensity: 0.6 });
+        const reactor = new THREE.Mesh(reactorGeo, reactorMat);
+        reactor.position.set(0, 4, 0);
+        bGroup.add(reactor);
       } else if (b.id === 'collaboration-centre') {
-        // Twin connected cyber towers with skybridge
-        const towerGeo = new THREE.BoxGeometry(4.5, 16, 4.5);
-        const towerMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, metalness: 0.8, roughness: 0.2 });
-        const t1 = new THREE.Mesh(towerGeo, towerMat);
-        t1.position.set(-4, 8, 0);
-        bGroup.add(t1);
+        // Tiered Open Amphitheatre with Suspended Skywalks (Building 6)
+        const amphiGeo = new THREE.CylinderGeometry(8, 11, 6, 16, 2, true);
+        const amphiMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, metalness: 0.7, roughness: 0.4, side: THREE.DoubleSide });
+        const amphi = new THREE.Mesh(amphiGeo, amphiMat);
+        amphi.position.y = 3;
+        bGroup.add(amphi);
 
-        const t2 = new THREE.Mesh(towerGeo, towerMat);
-        t2.position.set(4, 8, 0);
-        bGroup.add(t2);
-
-        // Glowing Glass Skybridge
-        const bridgeGeo = new THREE.BoxGeometry(6, 1.8, 2.5);
-        const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x3B82F6, emissive: 0x3B82F6, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 });
-        const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
-        bridge.position.set(0, 10, 0);
-        bGroup.add(bridge);
+        // Study Group Lanterns
+        const lanternGeo = new THREE.SphereGeometry(0.8, 16, 16);
+        const lanternMat = new THREE.MeshStandardMaterial({ color: 0x2EC4B6, emissive: 0x2EC4B6, emissiveIntensity: 0.8 });
+        const lantern1 = new THREE.Mesh(lanternGeo, lanternMat);
+        lantern1.position.set(-5, 7, 2);
+        bGroup.add(lantern1);
+        const lantern2 = new THREE.Mesh(lanternGeo, lanternMat);
+        lantern2.position.set(5, 7, -2);
+        bGroup.add(lantern2);
       } else {
-        // Progress Centre: Quantum crystalline obelisk with tiered ascending rings
-        const obeliskGeo = new THREE.ConeGeometry(3.5, 18, 4);
-        const obeliskMat = new THREE.MeshStandardMaterial({ color: 0x06B6D4, emissive: 0x0891B2, emissiveIntensity: 0.5, metalness: 0.9, roughness: 0.1 });
-        const obelisk = new THREE.Mesh(obeliskGeo, obeliskMat);
-        obelisk.position.y = 9;
-        bGroup.add(obelisk);
+        // Astronomical Observatory with Rotating Dome (Building 7)
+        const obsBaseGeo = new THREE.CylinderGeometry(6, 6, 7, 16);
+        const obsMat = new THREE.MeshStandardMaterial({ color: 0xDCD8CF, metalness: 0.7, roughness: 0.3 });
+        const obsBase = new THREE.Mesh(obsBaseGeo, obsMat);
+        obsBase.position.y = 3.5;
+        bGroup.add(obsBase);
 
-        for (let r = 0; r < 3; r++) {
-          const ringG = new THREE.TorusGeometry(4 + r * 1.5, 0.1, 16, 32);
-          const ringM = new THREE.MeshBasicMaterial({ color: 0x22D3EE, wireframe: true });
-          const rMesh = new THREE.Mesh(ringG, ringM);
-          rMesh.rotation.x = Math.PI / 2;
-          rMesh.position.y = 4 + r * 4;
-          bGroup.add(rMesh);
-        }
+        const domeGeo = new THREE.SphereGeometry(5.2, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const domeMat = new THREE.MeshStandardMaterial({ color: 0x1C2A33, metalness: 0.9, roughness: 0.15 });
+        const dome = new THREE.Mesh(domeGeo, domeMat);
+        dome.position.y = 7;
+        bGroup.add(dome);
       }
 
-      // Entrance Beacon & Ground Glow Ring
-      const beaconGeo = new THREE.CylinderGeometry(0.8, 1.4, 0.4, 16);
-      const beaconMat = new THREE.MeshStandardMaterial({ color: b.color, emissive: b.color, emissiveIntensity: 0.8 });
+      // Entrance Pavement Light Line (Guiding Line to Plaza)
+      const lineGeo = new THREE.PlaneGeometry(1.2, b.distance - 12);
+      const lineMat = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.25 });
+      const line = new THREE.Mesh(lineGeo, lineMat);
+      line.rotation.x = -Math.PI / 2;
+      line.rotation.z = Math.atan2(bx, bz) + Math.PI / 2;
+      line.position.set(-bx * 0.45, 0.03, -bz * 0.45);
+      bGroup.add(line);
+
+      // Entrance Beacon
+      const beaconGeo = new THREE.CylinderGeometry(0.8, 1.2, 0.3, 16);
+      const beaconMat = new THREE.MeshStandardMaterial({ color: b.color, emissive: b.color, emissiveIntensity: 0.9 });
       const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-      beacon.position.y = 0.2;
+      beacon.position.y = 0.15;
       bGroup.add(beacon);
 
-      // Light stream from building to central plaza
-      const pathGeo = new THREE.PlaneGeometry(1.5, b.distance);
-      const pathMat = new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.2 });
-      const path = new THREE.Mesh(pathGeo, pathMat);
-      path.rotation.x = -Math.PI / 2;
-      path.rotation.z = Math.atan2(bx, bz) + Math.PI / 2;
-      path.position.set(-bx / 2, 0.03, -bz / 2);
-      bGroup.add(path);
-
       scene.add(bGroup);
-      buildingMeshes.push({
-        spec: b,
-        mesh: bGroup,
-        enterPos: new THREE.Vector3(bx * 0.8, 0, bz * 0.8)
-      });
+      buildingMeshes.push({ spec: b, group: bGroup, beacon });
     });
 
-    // 6. Ambient Particle Starfield / Cyber Dust
-    const particleCount = 500;
-    const particleGeo = new THREE.BufferGeometry();
-    const particlePos = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePos[i] = (Math.random() - 0.5) * 120;
-      particlePos[i + 1] = Math.random() * 35;
-      particlePos[i + 2] = (Math.random() - 0.5) * 120;
-    }
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
-    const particleMat = new THREE.PointsMaterial({
-      color: 0x00F0FF,
-      size: 0.35,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending
-    });
-    const particleSystem = new THREE.Points(particleGeo, particleMat);
-    scene.add(particleSystem);
+    // 6. City Life Simulation: Outer Maglev Tram & Rooftop Delivery Drone
+    const tramTrackRadius = 50;
+    const tramGeo = new THREE.BoxGeometry(2.5, 1.6, 5);
+    const tramMat = new THREE.MeshStandardMaterial({ color: 0xDCD8CF, metalness: 0.9, roughness: 0.2 });
+    const tramMesh = new THREE.Mesh(tramGeo, tramMat);
+    tramMesh.position.set(tramTrackRadius, 0.9, 0);
+    scene.add(tramMesh);
 
-    // 7. Third-Person Player Avatar (Cyber-Scholar)
+    // Delivery Drone Spline
+    const droneGeo = new THREE.ConeGeometry(0.6, 0.4, 4);
+    const droneMat = new THREE.MeshStandardMaterial({ color: 0x2EC4B6, emissive: 0x2EC4B6, emissiveIntensity: 0.9 });
+    const droneMesh = new THREE.Mesh(droneGeo, droneMat);
+    droneMesh.position.set(15, 22, -15);
+    scene.add(droneMesh);
+
+    // 7. Third-Person Player Avatar (1.75m Scale, Kinematic Controller)
     const playerGroup = new THREE.Group();
     playerGroup.position.set(0, 0, 8);
 
-    // Player Body
-    const pBodyGeo = new THREE.CapsuleGeometry(0.5, 1.2, 8, 16);
-    const pBodyMat = new THREE.MeshStandardMaterial({ color: 0x0F172A, metalness: 0.8, roughness: 0.2 });
+    const pBodyGeo = new THREE.CapsuleGeometry(0.45, 1.1, 8, 16);
+    const pBodyMat = new THREE.MeshStandardMaterial({ color: 0x111821, metalness: 0.8, roughness: 0.2 });
     const pBody = new THREE.Mesh(pBodyGeo, pBodyMat);
-    pBody.position.y = 1.1;
+    pBody.position.y = 1.0;
     playerGroup.add(pBody);
 
-    // Player Glowing Visor
-    const pVisorGeo = new THREE.BoxGeometry(0.55, 0.2, 0.3);
-    const pVisorMat = new THREE.MeshStandardMaterial({ color: 0x00F0FF, emissive: 0x00F0FF, emissiveIntensity: 1.0 });
+    const pVisorGeo = new THREE.BoxGeometry(0.5, 0.18, 0.28);
+    const pVisorMat = new THREE.MeshStandardMaterial({ color: 0x2EC4B6, emissive: 0x2EC4B6, emissiveIntensity: 1.0 });
     const pVisor = new THREE.Mesh(pVisorGeo, pVisorMat);
-    pVisor.position.set(0, 1.45, 0.3);
+    pVisor.position.set(0, 1.35, 0.28);
     playerGroup.add(pVisor);
-
-    // Player Direction Indicator & Light Ring
-    const pRingGeo = new THREE.RingGeometry(0.8, 1.0, 24);
-    const pRingMat = new THREE.MeshBasicMaterial({ color: 0x00F0FF, side: THREE.DoubleSide });
-    const pRing = new THREE.Mesh(pRingGeo, pRingMat);
-    pRing.rotation.x = -Math.PI / 2;
-    pRing.position.y = 0.05;
-    playerGroup.add(pRing);
 
     scene.add(playerGroup);
 
-    // 8. Player Movement & Physics State
+    // Movement & Game Loop Variables
     const playerPos = new THREE.Vector3(0, 0, 8);
     let playerRot = 0;
     const moveSpeed = 0.32;
-    const sprintMultiplier = 1.6;
+    const sprintSpeed = 0.52;
 
-    // 9. Input Listeners
+    // Input Listeners
     const handleKeyDown = (e: KeyboardEvent) => {
       keysRef.current[e.key.toLowerCase()] = true;
       if (e.key.toLowerCase() === 'e' || e.code === 'Space') {
-        // Trigger enter nearby building if in range
+        // Check proximity to building or kiosk
+        const distToKiosk = playerPos.distanceTo(new THREE.Vector3(4, 0, 5));
+        if (distToKiosk < 4) {
+          sounds.playClick();
+          onOpenUploadTerminal?.();
+          return;
+        }
+
         const nearby = checkProximity(playerPos);
         if (nearby) {
           sounds.playWarp();
           onEnterBuilding(nearby.id);
         }
+      } else if (e.key.toLowerCase() === 'm') {
+        setIsMapMode(prev => !prev);
+      } else if (e.key.toLowerCase() === 'h') {
+        setShowHelpModal(prev => !prev);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        setShowQuickTravel(prev => !prev);
       }
     };
 
@@ -372,7 +431,7 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
-    // Mouse drag for camera rotation
+    // Mouse Controls for Orbit Camera
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) {
         isDraggingCameraRef.current = true;
@@ -387,7 +446,7 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
 
       cameraAngleRef.current.theta -= dx * 0.005;
-      cameraAngleRef.current.phi = Math.max(0.1, Math.min(Math.PI / 2.2, cameraAngleRef.current.phi - dy * 0.005));
+      cameraAngleRef.current.phi = Math.max(0.12, Math.min(Math.PI / 2.3, cameraAngleRef.current.phi - dy * 0.005));
     };
 
     const handleMouseUp = () => {
@@ -395,7 +454,7 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
     };
 
     const handleWheel = (e: WheelEvent) => {
-      cameraAngleRef.current.distance = Math.max(8, Math.min(45, cameraAngleRef.current.distance + e.deltaY * 0.02));
+      cameraAngleRef.current.distance = Math.max(8, Math.min(48, cameraAngleRef.current.distance + e.deltaY * 0.02));
     };
 
     container.addEventListener('mousedown', handleMouseDown);
@@ -403,18 +462,16 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
     window.addEventListener('mouseup', handleMouseUp);
     container.addEventListener('wheel', handleWheel);
 
-    // Check proximity helper
     const checkProximity = (pos: THREE.Vector3): BuildingSpec | null => {
       for (const b of buildingMeshes) {
-        const dist = pos.distanceTo(b.mesh.position);
-        if (dist < 10) {
+        if (pos.distanceTo(b.group.position) < 11) {
           return b.spec;
         }
       }
       return null;
     };
 
-    // 10. Animation Loop
+    // 8. 60 FPS Animation Loop
     let animId: number;
     let clock = new THREE.Clock();
 
@@ -423,14 +480,21 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
       const delta = clock.getDelta();
       const time = clock.getElapsedTime();
 
-      // Rotate crystals and particles
-      centralCrystal.rotation.y += 0.015;
-      centralCrystal.position.y = 5 + Math.sin(time * 2) * 0.4;
-      particleSystem.rotation.y += 0.0005;
+      // Rotate Infinity Sculpture & Holo Ring
+      loopMesh.rotation.y += 0.012;
+      holoRing.rotation.z += 0.008;
 
-      // Calculate Player Movement Vector
+      // Animate Maglev Tram around Plaza Loop
+      const tramAngle = time * 0.25;
+      tramMesh.position.set(Math.cos(tramAngle) * tramTrackRadius, 0.9, Math.sin(tramAngle) * tramTrackRadius);
+      tramMesh.rotation.y = -tramAngle;
+
+      // Animate Rooftop Delivery Drone
+      droneMesh.position.x = Math.sin(time * 0.5) * 22;
+      droneMesh.position.z = Math.cos(time * 0.5) * 22;
+
+      // Player Movement Logic
       const keys = keysRef.current;
-      const joy = joystickRef.current;
       let moveX = 0;
       let moveZ = 0;
 
@@ -439,18 +503,11 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
       if (keys['a'] || keys['arrowleft']) moveX -= 1;
       if (keys['d'] || keys['arrowright']) moveX += 1;
 
-      // Virtual joystick
-      if (Math.abs(joy.x) > 0.1 || Math.abs(joy.y) > 0.1) {
-        moveX = joy.x;
-        moveZ = -joy.y;
-      }
-
       const isMoving = Math.abs(moveX) > 0.01 || Math.abs(moveZ) > 0.01;
       const isSprinting = keys['shift'] || false;
-      const currentSpeed = moveSpeed * (isSprinting ? sprintMultiplier : 1.0);
+      const speed = isSprinting ? sprintSpeed : moveSpeed;
 
       if (isMoving) {
-        // Compute movement direction relative to camera angle
         const camTheta = cameraAngleRef.current.theta;
         const forward = new THREE.Vector3(-Math.sin(camTheta), 0, -Math.cos(camTheta));
         const right = new THREE.Vector3(Math.cos(camTheta), 0, -Math.sin(camTheta));
@@ -460,11 +517,11 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
           .addScaledVector(right, moveX)
           .normalize();
 
-        playerPos.addScaledVector(moveDir, currentSpeed);
+        playerPos.addScaledVector(moveDir, speed);
 
-        // Clamp to Plaza Radius (55 units)
-        if (playerPos.length() > 54) {
-          playerPos.setLength(54);
+        // Plaza boundary clamp
+        if (playerPos.length() > 52) {
+          playerPos.setLength(52);
         }
 
         playerRot = Math.atan2(moveDir.x, moveDir.z);
@@ -473,25 +530,26 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
 
       playerGroup.position.copy(playerPos);
 
-      // Check Nearby Building Proximity
-      const nearby = checkProximity(playerPos);
-      setActiveNearbyBuilding(nearby);
+      // Proximity checks
+      const nearbyB = checkProximity(playerPos);
+      setActiveNearbyBuilding(nearbyB);
+      setIsNearKiosk(playerPos.distanceTo(new THREE.Vector3(4, 0, 5)) < 3.5);
       setPlayerCoord({ x: Math.round(playerPos.x), z: Math.round(playerPos.z), rot: playerRot });
 
-      // Update Camera Position
-      if (isAerialRef.current) {
-        // High Aerial View looking straight down at plaza
-        camera.position.lerp(new THREE.Vector3(0, 75, 20), 0.05);
+      // Camera Positioning: Map Mode vs Third-Person Walk
+      if (isMapModeRef.current) {
+        // Satellite / Scale Model Top-Down View (Map Mode)
+        camera.position.lerp(new THREE.Vector3(0, 78, 18), 0.08);
         camera.lookAt(0, 0, 0);
       } else {
         // Third Person Camera Orbit
         const { theta, phi, distance } = cameraAngleRef.current;
         const targetX = playerPos.x + distance * Math.sin(theta) * Math.cos(phi);
-        const targetY = playerPos.y + distance * Math.sin(phi) + 2.5;
+        const targetY = playerPos.y + distance * Math.sin(phi) + 2.2;
         const targetZ = playerPos.z + distance * Math.cos(theta) * Math.cos(phi);
 
         camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.12);
-        camera.lookAt(playerPos.x, playerPos.y + 1.5, playerPos.z);
+        camera.lookAt(playerPos.x, playerPos.y + 1.4, playerPos.z);
       }
 
       renderer.render(scene, camera);
@@ -499,7 +557,6 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
 
     animate();
 
-    // Resize Handler
     const handleResize = () => {
       if (!container) return;
       width = container.clientWidth || window.innerWidth;
@@ -521,29 +578,30 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
     };
-  }, []);
+  }, [completedModulesCount]);
 
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden bg-slate-950 select-none">
+    <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden bg-[#0A0E13] select-none">
       {/* 3D WebGL Canvas */}
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Holographic Controls HUD (Top Left) */}
+      {/* Top Left: 5D Live HUD */}
       <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-        <div className="glass-panel p-3 rounded-xl flex items-center gap-3 text-xs text-slate-300">
-          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-          <span className="font-semibold text-cyan-400 uppercase tracking-wider">3D Campus Live</span>
-          <span className="text-slate-500">|</span>
-          <span>WASD / Arrows to Move</span>
-          <span className="text-slate-500">|</span>
-          <span>Shift to Sprint</span>
-          <span className="text-slate-500">|</span>
-          <span>Drag to Rotate View</span>
+        <div className="glass-panel p-3 rounded-xl flex items-center gap-3 text-xs text-[#EEF2F5] border border-white/10">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#2EC4B6] animate-ping" />
+          <span className="font-semibold text-[#2EC4B6] uppercase tracking-wider">Infinity City 2045</span>
+          <span className="text-[#9AA7B2]">|</span>
+          <span className="font-mono text-[#F2A541] flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            Blue Hour (Local 23:30)
+          </span>
+          <span className="text-[#9AA7B2]">|</span>
+          <span className="text-[#9AA7B2]">WASD: Walk • Shift: Run • E: Enter</span>
         </div>
 
-        {/* Quick Teleport Sector Selector */}
-        <div className="glass-panel p-2 rounded-xl flex items-center gap-1.5 flex-wrap max-w-xl">
-          <span className="text-xs text-slate-400 font-medium px-2">Teleport:</span>
+        {/* Quick Sector Selector Bar */}
+        <div className="glass-panel p-2 rounded-xl flex items-center gap-1.5 flex-wrap max-w-xl border border-white/10">
+          <span className="text-[11px] text-[#9AA7B2] font-semibold px-2">Teleport:</span>
           {BUILDINGS.map((b) => (
             <button
               key={b.id}
@@ -551,68 +609,80 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
                 sounds.playWarp();
                 onEnterBuilding(b.id);
               }}
-              className="px-2.5 py-1 text-xs rounded-lg bg-slate-800/80 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700/50 hover:border-cyan-500/40 transition-all flex items-center gap-1"
+              className="px-2.5 py-1 text-xs rounded-lg bg-slate-800/80 hover:bg-[#2EC4B6]/20 text-[#EEF2F5] hover:text-[#2EC4B6] border border-white/10 hover:border-[#2EC4B6]/40 transition-all flex items-center gap-1"
             >
-              <span>{b.icon}</span>
-              <span className="hidden sm:inline">{b.name}</span>
+              <span>{b.name}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* View Mode & Audio Controls (Top Right) */}
+      {/* Top Right: Mode Switchers (City Mode, Map Mode, Study Mode) */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {/* Toggle Map Mode [M] */}
         <button
           onClick={() => {
             sounds.playClick();
-            setIsAerialView(!isAerialView);
+            setIsMapMode(!isMapMode);
           }}
-          className={`px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border transition-all ${
-            isAerialView
-              ? 'bg-cyan-500/30 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
-              : 'glass-panel text-slate-300 hover:text-cyan-300 border-cyan-500/20'
+          className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all ${
+            isMapMode
+              ? 'bg-[#2EC4B6]/25 text-[#2EC4B6] border-[#2EC4B6] shadow-[0_0_15px_rgba(46,196,182,0.3)]'
+              : 'glass-panel text-[#EEF2F5] hover:text-[#2EC4B6] border-white/10'
           }`}
+          title="Toggle Satellite Scale Model Map [M]"
         >
-          <Eye className="w-4 h-4 text-cyan-400" />
-          <span>{isAerialView ? 'Third Person View' : 'Aerial Overview'}</span>
+          <Eye className="w-4 h-4 text-[#2EC4B6]" strokeWidth={1.5} />
+          <span>{isMapMode ? 'City Mode [M]' : 'Map Mode [M]'}</span>
         </button>
 
+        {/* 2D Academic Dashboard Mode */}
         <button
           onClick={() => {
             sounds.playClick();
             onSwitchToDashboard();
           }}
-          className="px-3 py-2 rounded-xl text-xs font-medium glass-panel text-slate-300 hover:text-cyan-300 border-cyan-500/20 hover:border-cyan-400 transition-all flex items-center gap-2"
+          className="px-3 py-2 rounded-xl text-xs font-semibold glass-panel text-[#EEF2F5] hover:text-[#2EC4B6] border-white/10 hover:border-[#2EC4B6]/40 transition-all flex items-center gap-2"
+          title="Switch to 2D Study Dashboard"
         >
-          <Maximize2 className="w-4 h-4 text-cyan-400" />
-          <span>2D Dashboard Mode</span>
+          <Maximize2 className="w-4 h-4 text-[#2EC4B6]" strokeWidth={1.5} />
+          <span>2D Dashboard</span>
         </button>
 
+        {/* Controls Help [H] */}
+        <button
+          onClick={() => setShowHelpModal(true)}
+          className="p-2 rounded-xl glass-panel text-[#9AA7B2] hover:text-[#2EC4B6] border-white/10 transition-all"
+          title="Controls Help [H]"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+
+        {/* Audio Mute/Unmute */}
         <button
           onClick={() => {
             const muted = sounds.toggleMute();
             setIsMuted(muted);
           }}
-          className="p-2 rounded-xl glass-panel text-slate-300 hover:text-cyan-400 border-cyan-500/20 transition-all"
+          className="p-2 rounded-xl glass-panel text-[#9AA7B2] hover:text-[#2EC4B6] border-white/10 transition-all"
           title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
         >
-          {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
+          {isMuted ? <VolumeX className="w-4 h-4 text-[#FF6B5E]" /> : <Volume2 className="w-4 h-4 text-[#2EC4B6]" />}
         </button>
       </div>
 
       {/* Proximity Interaction Prompt (Center Bottom) */}
       {activeNearbyBuilding && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 animate-bounce">
-          <div className="glass-panel-glow px-6 py-4 rounded-2xl flex items-center gap-4 border border-cyan-400 shadow-[0_0_30px_rgba(0,240,255,0.4)]">
-            <span className="text-3xl">{activeNearbyBuilding.icon}</span>
+          <div className="glass-panel p-4 rounded-2xl flex items-center gap-4 border border-[#2EC4B6] shadow-[0_0_30px_rgba(46,196,182,0.35)]">
             <div>
-              <div className="text-xs font-semibold text-cyan-400 uppercase tracking-widest">
+              <div className="text-[11px] font-semibold text-[#2EC4B6] uppercase tracking-widest">
                 Sector In Range
               </div>
-              <div className="text-lg font-bold text-white">
+              <div className="text-lg font-bold text-[#EEF2F5]">
                 {activeNearbyBuilding.name}
               </div>
-              <div className="text-xs text-slate-300">
+              <div className="text-xs text-[#9AA7B2]">
                 {activeNearbyBuilding.category}
               </div>
             </div>
@@ -621,48 +691,73 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
                 sounds.playWarp();
                 onEnterBuilding(activeNearbyBuilding.id);
               }}
-              className="ml-4 px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-sm shadow-[0_0_20px_rgba(0,240,255,0.6)] transition-all flex items-center gap-2"
+              className="ml-3 btn-teal px-5 py-2.5 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(46,196,182,0.5)]"
             >
-              <Zap className="w-4 h-4 fill-slate-950" />
-              <span>Press [E] or Enter</span>
+              <Zap className="w-4 h-4" />
+              <span>Press [E] to Enter</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* 3D Minimap Radar (Bottom Right) */}
-      <div className="absolute bottom-6 right-6 z-20 glass-panel p-3 rounded-2xl border border-cyan-500/30">
+      {/* Proximity Prompt for Plaza Upload Terminal */}
+      {isNearKiosk && !activeNearbyBuilding && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 animate-bounce">
+          <div className="glass-panel p-4 rounded-2xl flex items-center gap-4 border border-[#F2A541] shadow-[0_0_30px_rgba(242,165,65,0.35)]">
+            <FileUp className="w-6 h-6 text-[#F2A541]" />
+            <div>
+              <div className="text-[11px] font-semibold text-[#F2A541] uppercase tracking-widest">
+                Plaza Document Terminal
+              </div>
+              <div className="text-sm font-bold text-[#EEF2F5]">
+                Upload Course Slides & PDFs
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                sounds.playClick();
+                onOpenUploadTerminal?.();
+              }}
+              className="ml-3 btn-amber px-5 py-2 text-xs font-bold flex items-center gap-1.5"
+            >
+              <span>Press [E] to Open Terminal</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Radar Minimap with Coordinates (Bottom Right) */}
+      <div className="absolute bottom-6 right-6 z-20 glass-panel p-3 rounded-2xl border border-white/10">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2EC4B6]">
             <Compass className="w-3.5 h-3.5" />
             <span>RADAR MINIMAP</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">
+          <span className="text-[10px] text-[#9AA7B2] font-mono">
             X:{playerCoord.x} Z:{playerCoord.z}
           </span>
         </div>
-        <div className="relative w-36 h-36 rounded-full bg-slate-900/90 border border-cyan-500/40 overflow-hidden flex items-center justify-center">
-          {/* Radar Sweep Line */}
-          <div className="absolute inset-0 rounded-full border border-cyan-500/20" />
-          <div className="absolute w-24 h-24 rounded-full border border-cyan-500/10" />
-          <div className="absolute w-12 h-12 rounded-full border border-cyan-500/10" />
-          <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-cyan-500/20" />
-          <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-cyan-500/20" />
+        <div className="relative w-36 h-36 rounded-full bg-[#0A0E13]/90 border border-[#2EC4B6]/30 overflow-hidden flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border border-white/5" />
+          <div className="absolute w-24 h-24 rounded-full border border-white/5" />
+          <div className="absolute w-12 h-12 rounded-full border border-white/5" />
+          <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-white/10" />
+          <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/10" />
 
-          {/* Rotating Radar Scanner */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 to-transparent rounded-full animate-radar origin-center pointer-events-none" />
+          {/* Radar Sweep Animation */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#2EC4B6]/20 to-transparent rounded-full animate-radar origin-center pointer-events-none" />
 
-          {/* Building Beacons on Radar */}
+          {/* Building Markers */}
           {BUILDINGS.map((b) => {
-            const bx = (Math.sin(b.angle) * b.distance) / 60; // normalized -1 to 1
-            const bz = (Math.cos(b.angle) * b.distance) / 60;
+            const bx = (Math.sin(b.angle) * b.distance) / 55;
+            const bz = (Math.cos(b.angle) * b.distance) / 55;
             const leftPct = 50 + bx * 42;
             const topPct = 50 + bz * 42;
             return (
               <div
                 key={b.id}
                 style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-                className="absolute w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(0,240,255,0.8)] cursor-pointer hover:scale-150 transition-all"
+                className="absolute w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2EC4B6] shadow-[0_0_6px_rgba(46,196,182,0.8)] cursor-pointer hover:scale-150 transition-all"
                 title={b.name}
                 onClick={() => {
                   sounds.playWarp();
@@ -672,16 +767,63 @@ export const ThreeCityScene: React.FC<ThreeCitySceneProps> = ({ onEnterBuilding,
             );
           })}
 
-          {/* Player Dot */}
+          {/* Player Position Dot */}
           <div
             style={{
-              left: `${50 + (playerCoord.x / 60) * 42}%`,
-              top: `${50 + (playerCoord.z / 60) * 42}%`
+              left: `${50 + (playerCoord.x / 55) * 42}%`,
+              top: `${50 + (playerCoord.z / 55) * 42}%`
             }}
-            className="absolute w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-400 border border-white shadow-[0_0_8px_rgba(192,132,252,0.9)] z-10"
+            className="absolute w-3 h-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F2A541] border border-white shadow-[0_0_8px_rgba(242,165,65,0.9)] z-10"
           />
         </div>
       </div>
+
+      {/* Controls Help Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="glass-panel p-6 rounded-2xl w-full max-w-md border border-white/20 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+              <h3 className="text-base font-bold text-[#EEF2F5] flex items-center gap-2">
+                <Navigation className="w-4 h-4 text-[#2EC4B6]" />
+                Infinity City Controls
+              </h3>
+              <button onClick={() => setShowHelpModal(false)} className="text-[#9AA7B2] hover:text-[#EEF2F5]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-[#EEF2F5]">
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">W, A, S, D / Arrows</span>
+                <span className="text-[#9AA7B2]">Walk Avatar</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">Shift</span>
+                <span className="text-[#9AA7B2]">Sprint (1.6x Speed)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">Left Mouse Drag</span>
+                <span className="text-[#9AA7B2]">Orbit Camera</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">Mouse Wheel</span>
+                <span className="text-[#9AA7B2]">Zoom In / Out</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">E / Space</span>
+                <span className="text-[#9AA7B2]">Interact with Building or Kiosk</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-white/5">
+                <span className="font-semibold text-[#2EC4B6]">M</span>
+                <span className="text-[#9AA7B2]">Toggle Map Mode (Top-Down Aerial)</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="font-semibold text-[#2EC4B6]">Tab</span>
+                <span className="text-[#9AA7B2]">Quick Travel Menu</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

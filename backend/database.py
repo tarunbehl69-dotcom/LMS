@@ -204,11 +204,37 @@ def init_db():
     """)
 
     # Ensure columns exist if table was previously created
-    for col, col_type in [("file_path", "TEXT"), ("is_user_uploaded", "INTEGER DEFAULT 0")]:
+    for col, col_type in [
+        ("file_path", "TEXT"), 
+        ("is_user_uploaded", "INTEGER DEFAULT 0"),
+        ("is_trashed", "INTEGER DEFAULT 0"),
+        ("trashed_at", "TEXT")
+    ]:
         try:
             cursor.execute(f"ALTER TABLE library_resources ADD COLUMN {col} {col_type}")
         except Exception:
             pass
+
+    # Storage Quotas Table (Section 7.2)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS storage_quotas (
+        user_id TEXT PRIMARY KEY,
+        bytes_used INTEGER DEFAULT 0,
+        bytes_limit INTEGER DEFAULT 1073741824 -- 1 GB student default
+    );
+    """)
+
+    # Document Audit Log Table (Section 7.6 & 7.10)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS document_events (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        actor_name TEXT NOT NULL,
+        action TEXT NOT NULL, -- 'uploaded', 'viewed', 'detached', 'trashed', 'restored', 'deleted_permanent'
+        target_name TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
 
     # 12. Bookmarks Table
     cursor.execute("""

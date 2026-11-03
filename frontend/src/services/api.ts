@@ -363,6 +363,101 @@ export const api = {
     return { status: 'success' };
   },
 
+  // Level 2: Move to Trash (30 days retention)
+  moveToTrash: async (resourceId: string) => {
+    try {
+      const resp = await fetch(`http://localhost:8000/api/library/resources/${resourceId}/trash`, {
+        method: 'POST'
+      });
+      if (resp.ok) {
+        localLms.removeResource(resourceId);
+        return { status: 'success' };
+      }
+    } catch (e) {
+      console.warn('Move to trash fallback', e);
+    }
+    localLms.removeResource(resourceId);
+    return { status: 'success' };
+  },
+
+  // Restore from Trash
+  restoreFromTrash: async (resourceId: string) => {
+    try {
+      const resp = await fetch(`http://localhost:8000/api/library/resources/${resourceId}/restore`, {
+        method: 'POST'
+      });
+      if (resp.ok) {
+        return { status: 'success' };
+      }
+    } catch (e) {
+      console.warn('Restore fallback', e);
+    }
+    return { status: 'success' };
+  },
+
+  // Get Trash list
+  getTrashDocuments: async (): Promise<LibraryResource[]> => {
+    try {
+      const resp = await fetch('http://localhost:8000/api/library/trash');
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('Get trash fallback', e);
+    }
+    return [];
+  },
+
+  // Level 3: Permanent Delete (Cleans file, frees quota, writes audit log)
+  deletePermanent: async (resourceId: string) => {
+    try {
+      const resp = await fetch(`http://localhost:8000/api/library/resources/${resourceId}`, {
+        method: 'DELETE'
+      });
+      if (resp.ok) {
+        localLms.removeResource(resourceId);
+        return { status: 'success' };
+      }
+    } catch (e) {
+      console.warn('Permanent delete fallback', e);
+    }
+    localLms.removeResource(resourceId);
+    return { status: 'success' };
+  },
+
+  // Storage Quota Meter
+  getStorageQuota: async (userId: string = 'usr_student_1') => {
+    try {
+      const resp = await fetch(`http://localhost:8000/api/library/quota?user_id=${userId}`);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('Quota API fallback', e);
+    }
+    return {
+      user_id: userId,
+      bytes_used: 184549376,
+      bytes_limit: 1073741824,
+      mb_used: 176.0,
+      mb_limit: 1024.0,
+      percent_used: 17.2
+    };
+  },
+
+  // Document Audit Log
+  getDocumentAuditLog: async () => {
+    try {
+      const resp = await fetch('http://localhost:8000/api/library/audit-log');
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      console.warn('Audit log fallback', e);
+    }
+    return [];
+  },
+
   // --- Experiment Lab ---
   getSimulations: async (): Promise<Simulation[]> => {
     return safeFetch<Simulation[]>(

@@ -5,6 +5,12 @@
 
 export type UserRole = 'student' | 'instructor' | 'admin';
 
+export type AppMode = 'city' | 'map' | 'study';
+
+export type TimeOfDay = 'dawn' | 'morning' | 'midday' | 'golden_hour' | 'blue_hour' | 'night';
+
+export type WeatherCondition = 'clear' | 'overcast' | 'rain';
+
 export type AppView = 
   | 'landing'
   | 'explore-3d'
@@ -16,6 +22,7 @@ export type AppView =
   | 'experiment-lab'
   | 'collaboration-centre'
   | 'progress-centre'
+  | 'my-files'
   | 'instructor-portal'
   | 'admin-portal';
 
@@ -279,4 +286,46 @@ export interface PlatformMetrics {
   total_resources: number;
   system_status: string;
   active_version: string;
+}
+
+export interface ManagedDocument {
+  id: string;
+  owner_id: string;
+  owner_name?: string;
+  title: string;
+  description: string;
+  file_type: 'pdf' | 'ppt' | 'pptx';
+  mime_type: string;
+  size_bytes: number;
+  sha256?: string;
+  page_or_slide_count: number;
+  status: 'uploading' | 'processing' | 'ready' | 'failed' | 'protected';
+  failure_reason?: string;
+  visibility: 'private' | 'group' | 'course' | 'library';
+  current_version: number;
+  thumbnail_url?: string;
+  preview_pdf_url?: string;
+  download_url?: string;
+  created_at: string;
+  updated_at: string;
+  is_trashed?: boolean;
+  trashed_at?: string;
+  usage_locations?: string[];
+  tags: string[];
+  course_id?: string;
+}
+
+export interface StorageQuota {
+  user_id: string;
+  bytes_used: number;
+  bytes_limit: number;
+}
+
+export interface DocumentAuditEntry {
+  id: string;
+  document_id: string;
+  actor_name: string;
+  action: 'uploaded' | 'viewed' | 'detached' | 'trashed' | 'restored' | 'deleted_permanent';
+  target_name?: string;
+  timestamp: string;
 }

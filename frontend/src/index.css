@@ -1,129 +1,152 @@
 @import "tailwindcss";
 
-:root {
-  --bg-deep-navy: #050B14;
-  --bg-graphite: #0E172A;
-  --bg-surface: #131C31;
-  --neon-cyan: #00F0FF;
-  --electric-blue: #3B82F6;
-  --cyber-purple: #8B5CF6;
-  --cyber-emerald: #10B981;
-  --cyber-amber: #F59E0B;
+@layer base {
+  :root {
+    --color-night-base: #0A0E13;
+    --color-panel-surface: #111821;
+    --color-panel-border: rgba(255, 255, 255, 0.08);
+    --color-ceramic-white: #DCD8CF;
+    --color-glass-tint: #1C2A33;
+    --color-signal-teal: #2EC4B6;
+    --color-sodium-amber: #F2A541;
+    --color-alert-coral: #FF6B5E;
+    --color-success-mint: #7BD389;
+    --color-text-primary: #EEF2F5;
+    --color-text-secondary: #9AA7B2;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #0A0E13;
+    color: #EEF2F5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+  }
+
+  code, pre, .font-mono, .data-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #050B14;
-  color: #F1F5F9;
-  min-height: 100vh;
-  overflow-x: hidden;
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.07) 0%, transparent 50%),
-    radial-gradient(circle at 15% 70%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
-}
-
-/* Thin futuristic neon scrollbars */
+/* Subtle, sleek scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(5, 11, 20, 0.8);
+  background: #0A0E13;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.25);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.55);
+  background: #2EC4B6;
 }
 
-/* Glassmorphism Classes */
+/* Architectural Blue Hour Panels */
 .glass-panel {
-  background: rgba(14, 23, 42, 0.72);
+  background: rgba(17, 24, 33, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 240, 255, 0.15);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
-.glass-panel-glow {
-  background: rgba(14, 23, 42, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  box-shadow: 0 0 25px rgba(0, 240, 255, 0.12), inset 0 0 15px rgba(0, 240, 255, 0.05);
-}
-
-.glass-panel-purple {
-  background: rgba(19, 28, 49, 0.8);
+.glass-panel-teal {
+  background: rgba(17, 24, 33, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(46, 196, 182, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(46, 196, 182, 0.08);
 }
 
-/* Cyber Glow Text */
-.glow-cyan {
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3);
+.glass-panel-amber {
+  background: rgba(17, 24, 33, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(242, 165, 65, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(242, 165, 65, 0.08);
 }
 
-.glow-purple {
-  text-shadow: 0 0 10px rgba(139, 92, 246, 0.6), 0 0 20px rgba(139, 92, 246, 0.3);
+/* Focused Accessible Rings */
+*:focus-visible {
+  outline: 2px solid #2EC4B6;
+  outline-offset: 2px;
 }
 
 /* Interactive Futuristic Buttons */
-.btn-cyber-primary {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(59, 130, 246, 0.3) 100%);
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  color: #00F0FF;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.btn-teal {
+  background: #2EC4B6;
+  color: #0A0E13;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.btn-cyber-primary:hover {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.35) 0%, rgba(59, 130, 246, 0.5) 100%);
-  border-color: #00F0FF;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+.btn-teal:hover {
+  background: #3ee1d2;
+  box-shadow: 0 0 16px rgba(46, 196, 182, 0.35);
   transform: translateY(-1px);
 }
 
-.btn-cyber-purple {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.3) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  color: #C084FC;
-  transition: all 0.2s ease;
+.btn-amber {
+  background: #F2A541;
+  color: #0A0E13;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.btn-cyber-purple:hover {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(168, 85, 247, 0.5) 100%);
-  border-color: #A855F7;
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+.btn-amber:hover {
+  background: #ffb454;
+  box-shadow: 0 0 16px rgba(242, 165, 65, 0.35);
   transform: translateY(-1px);
 }
 
-/* Scanline Holographic Overlay (Subtle) */
-.hologram-grid {
-  background-size: 30px 30px;
-  background-image: 
-    linear-gradient(to right, rgba(0, 240, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+.btn-outline-teal {
+  background: rgba(46, 196, 182, 0.08);
+  border: 1px solid rgba(46, 196, 182, 0.3);
+  color: #2EC4B6;
+  border-radius: 8px;
+  transition: all 0.18s ease;
+}
+.btn-outline-teal:hover {
+  background: rgba(46, 196, 182, 0.18);
+  border-color: #2EC4B6;
 }
 
-/* Animations */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 0.9; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
+/* Study Mode Light Theme */
+.study-mode-light {
+  background-color: #F7F6F3;
+  color: #14181D;
+}
+.study-mode-light .glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #14181D;
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 4s ease-in-out infinite;
-}
-
+/* Pavement & Radar Animations */
 @keyframes radar-sweep {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
 .animate-radar {
   animation: radar-sweep 5s linear infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+.animate-pulse-subtle {
+  animation: pulse-subtle 3.5s ease-in-out infinite;
 }
