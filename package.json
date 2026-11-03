@@ -1,10 +1,10 @@
 {
-  "name": "doremons-learning-world",
-  "version": "1.0.0",
+  "name": "learnloop-infinity",
+  "version": "2.0.0",
   "private": true,
-  "description": "AI-Powered Gamified 3D LMS inspired by Doraemon",
+  "description": "LearnLoop Infinity 2.0 - Futuristic 3D LMS Platform",
   "scripts": {
-    "build": "node -e \"if (require('fs').existsSync('frontend')) { require('child_process').execSync('cd frontend && npm run build', {stdio: 'inherit'}); } else { require('child_process').execSync('npm run build', {stdio: 'inherit'}); }\"",
+    "build": "cd frontend && npm install && npm run build",
     "start": "python run.py"
   }
 }
