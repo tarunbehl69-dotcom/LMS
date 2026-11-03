@@ -1,6 +1,6 @@
 """
-Doraemon AI Study World — Main Application Launcher
-Runs the full-stack application and opens your browser.
+LearnLoop Infinity 2.0 — Main Application Launcher
+Runs the full-stack Futuristic 3D LMS application and opens your browser.
 """
 import sys
 import os
@@ -12,9 +12,10 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 def main():
-    print("=" * 65)
-    print("  🎒 DOREMON'S LEARNING WORLD — AI-Powered Learning Platform")
-    print("=" * 65)
+    print("=" * 70)
+    print("  🌐 LEARNLOOP INFINITY 2.0 — Futuristic 3D Virtual University LMS")
+    print("  Tagline: Your Learning Journey. A Whole New Universe.")
+    print("=" * 70)
     print("\nStarting the server at http://127.0.0.1:8000 ...")
 
     # Check python venv
@@ -24,9 +25,8 @@ def main():
     # Command to run uvicorn
     cmd = [python_exe, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload"]
 
-    print("\n✨ Ready to learn! Opening your browser...")
+    print("\n✨ University Campus Online! Opening your browser...")
     try:
-        # Schedule browser opening after a slight delay
         import threading
         def open_browser():
             time.sleep(1.8)
@@ -36,7 +36,7 @@ def main():
         # Run Uvicorn
         subprocess.run(cmd)
     except KeyboardInterrupt:
-        print("\nServer stopped. See you next study session! 🌟")
+        print("\nServer offline. Thank you for exploring LearnLoop Infinity 2.0! 🌐")
 
 if __name__ == "__main__":
     main()

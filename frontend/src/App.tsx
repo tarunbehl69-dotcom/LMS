@@ -1,148 +1,289 @@
 import React, { useState, useEffect } from 'react';
-import { Course, CourseDetail, Lesson, GamificationProfile } from './types';
+import { 
+  AppView, 
+  BuildingId, 
+  Course, 
+  DailyMission, 
+  DiscussionThread, 
+  KanbanTask, 
+  LibraryResource, 
+  Quiz, 
+  Simulation, 
+  StudyGroup, 
+  UserProfile, 
+  UserRole, 
+  XPTransaction 
+} from './types';
 import { api } from './services/api';
-import { WelcomeLoginScreen } from './components/WelcomeLoginScreen';
-import { DoraemonHouseWorld } from './components/DoraemonHouseWorld';
-import { SubjectLearningWorld } from './components/SubjectLearningWorld';
+import { localLms } from './services/localLmsStore';
 import { sounds } from './services/soundEffects';
 
-export type AppView = 'welcome' | 'house' | 'subject';
+// Core Components
+import { Navbar } from './components/Navbar';
+import { LandingPage } from './components/LandingPage';
+import { ThreeCityScene } from './components/ThreeCityScene';
+import { DashboardView } from './components/DashboardView';
+import { KnowledgeTowerView } from './components/KnowledgeTowerView';
+import { AiHubView } from './components/AiHubView';
+import { ChallengeArenaView } from './components/ChallengeArenaView';
+import { DigitalLibraryView } from './components/DigitalLibraryView';
+import { ExperimentLabView } from './components/ExperimentLabView';
+import { CollaborationCentreView } from './components/CollaborationCentreView';
+import { ProgressCentreView } from './components/ProgressCentreView';
+import { InstructorPortalView } from './components/InstructorPortalView';
+import { AdminPortalView } from './components/AdminPortalView';
+import { CertificateModal } from './components/CertificateModal';
 
 export const App: React.FC = () => {
-  // Navigation View State: 'welcome' (Page 1) | 'house' (Page 2) | 'subject' (Page 3 & 4)
-  const [currentView, setCurrentView] = useState<AppView>('welcome');
+  const [currentView, setCurrentView] = useState<AppView>('landing');
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => localLms.getCurrentUser());
 
-  // Student Profile State
-  const [studentName, setStudentName] = useState<string>(() => {
-    return localStorage.getItem('doremon_student_name') || '';
-  });
-  const [studentId, setStudentId] = useState<string>(() => {
-    return localStorage.getItem('doremon_student_id') || 'student_himani';
-  });
-
-  // Data States
+  // Platform Data States
   const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourseDetail, setSelectedCourseDetail] = useState<CourseDetail | null>(null);
-  const [profile, setProfile] = useState<GamificationProfile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [resources, setResources] = useState<LibraryResource[]>([]);
+  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [discussions, setDiscussions] = useState<DiscussionThread[]>([]);
+  const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([]);
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [missions, setMissions] = useState<DailyMission[]>([]);
+  const [xpTransactions, setXpTransactions] = useState<XPTransaction[]>([]);
 
-  // Load all subjects and student progress from backend
-  const loadAllData = async () => {
-    setIsLoading(true);
+  // Certificate Modal State
+  const [certificateData, setCertificateData] = useState<{ courseTitle: string; certId: string } | null>(null);
+
+  // Load all platform state
+  const loadPlatformData = async () => {
     try {
-      const activeId = localStorage.getItem('doremon_student_id') || studentId;
-      const [coursesData, profileData] = await Promise.all([
+      const [
+        profileData,
+        coursesData,
+        quizzesData,
+        resourcesData,
+        simsData,
+        discData,
+        groupsData,
+        tasksData,
+        missionsData,
+        txsData
+      ] = await Promise.all([
+        api.getCurrentProfile(currentUser.id),
         api.getCourses(),
-        api.getGamificationProfile(activeId).catch(() => null),
+        api.getQuizzes(),
+        api.getLibraryResources(),
+        api.getSimulations(),
+        api.getDiscussions(),
+        api.getStudyGroups(),
+        api.getKanbanTasks(),
+        api.getDailyMissions(),
+        api.getXpTransactions()
       ]);
+
+      setCurrentUser(profileData);
       setCourses(coursesData);
-      setProfile(profileData);
+      setQuizzes(quizzesData);
+      setResources(resourcesData);
+      setSimulations(simsData);
+      setDiscussions(discData);
+      setStudyGroups(groupsData);
+      setTasks(tasksData);
+      setMissions(missionsData);
+      setXpTransactions(txsData);
     } catch (e) {
-      console.error('Failed to load LMS data', e);
-    } finally {
-      setIsLoading(false);
+      console.warn('Backend loading in fallback mode', e);
     }
   };
 
   useEffect(() => {
-    loadAllData();
-  }, []);
+    loadPlatformData();
+  }, [currentUser.id]);
 
-  // Handler: When student completes Page 1 Welcome Login
-  const handleStartLearning = async (name: string) => {
-    setStudentName(name);
-    localStorage.setItem('doremon_student_name', name);
-    try {
-      await api.createOrSwitchStudentProfile(name);
-    } catch {
-      // fallback
-    }
-    await loadAllData();
-    setCurrentView('house');
+  // Handler: Role Switcher (Student / Instructor / Admin)
+  const handleSwitchRole = (newRole: UserRole) => {
+    sounds.playSuccess();
+    const updatedUser = api.switchRole(newRole);
+    setCurrentUser(updatedUser);
   };
 
-  // Handler: Add a new Subject Cloud (Page 2 Add Subject Cloud Feature)
-  const handleAddSubject = async (subjectTitle: string) => {
-    await api.createSubject(subjectTitle);
-    await loadAllData();
+  // Handler: Entering any building from 3D scene or Dashboard
+  const handleEnterBuilding = (buildingId: BuildingId) => {
+    sounds.playWarp();
+    setCurrentView(buildingId);
   };
 
-  // Handler: Select a Subject Cloud to enter Page 3
-  const handleSelectSubject = async (courseId: string) => {
-    try {
-      sounds.playMagicChime();
-      const detail = await api.getCourseDetail(courseId);
-      setSelectedCourseDetail(detail);
-      setCurrentView('subject');
-    } catch (e) {
-      console.error('Failed to load subject details', e);
-    }
+  // Handler: Enrolling in course
+  const handleEnrollCourse = async (courseId: string) => {
+    await api.enrollInCourse(courseId);
+    await loadPlatformData();
   };
 
-  // Handler: Delete a Subject Cloud
-  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
-    try {
-      sounds.playMagicChime();
-      await api.deleteCourse(courseId);
-      if (selectedCourseDetail?.id === courseId) {
-        setSelectedCourseDetail(null);
-      }
-      await loadAllData();
-    } catch (e) {
-      console.error('Failed to delete course', e);
+  // Handler: Completing a lesson
+  const handleCompleteLesson = async (courseId: string, lessonId: string) => {
+    const res = await api.completeLesson(courseId, lessonId);
+    if (res.certId) {
+      const course = courses.find(c => c.id === courseId);
+      setCertificateData({
+        courseTitle: course ? course.title : 'Course Track',
+        certId: res.certId
+      });
     }
+    await loadPlatformData();
   };
 
-  // Handler: Reload a course when new files are uploaded
-  const handleReloadCourse = async (courseId: string) => {
-    try {
-      const detail = await api.getCourseDetail(courseId);
-      setSelectedCourseDetail(detail);
-      await loadAllData();
-    } catch (e) {
-      console.error('Failed to reload course', e);
-    }
+  // Handler: Claiming a daily mission
+  const handleClaimMission = async (missionId: string) => {
+    sounds.playSuccess();
+    await api.claimMission(missionId);
+    await loadPlatformData();
+  };
+
+  // Handler: Bookmark toggling
+  const handleToggleBookmark = async (resourceId: string) => {
+    sounds.playClick();
+    await api.toggleBookmark(resourceId);
+    await loadPlatformData();
+  };
+
+  // Handler: Join study group
+  const handleToggleJoinGroup = async (groupId: string) => {
+    sounds.playClick();
+    await api.toggleJoinGroup(groupId);
+    await loadPlatformData();
+  };
+
+  // Handler: Upvote discussion
+  const handleUpvoteDiscussion = async (threadId: string) => {
+    sounds.playClick();
+    await api.upvoteDiscussion(threadId);
+    await loadPlatformData();
+  };
+
+  // Handler: Add discussion
+  const handleAddDiscussion = async (channel: string, title: string, content: string, tags: string[]) => {
+    await api.createDiscussion(channel, title, content, tags);
+    await loadPlatformData();
+  };
+
+  // Handler: Add Kanban Task
+  const handleAddTask = async (groupId: string, title: string, assignee: string, priority: KanbanTask['priority']) => {
+    await api.createTask(groupId, title, assignee, priority);
+    await loadPlatformData();
+  };
+
+  // Handler: Update Kanban Task Status
+  const handleUpdateTaskStatus = async (taskId: string, status: KanbanTask['status']) => {
+    sounds.playClick();
+    await api.updateTaskStatus(taskId, status);
+    await loadPlatformData();
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#05162A] text-slate-800 font-sans">
-      {/* ============================================================== */}
-      {/* PAGE 1: DORAEMON WELCOMING LOGIN PAGE                          */}
-      {/* ============================================================== */}
-      {currentView === 'welcome' && (
-        <WelcomeLoginScreen
-          initialName={studentName}
-          onStartLearning={handleStartLearning}
-        />
-      )}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {/* Top Futuristic Navigation Bar (Present across all views except landing hero) */}
+      <Navbar
+        currentView={currentView}
+        onNavigate={(view) => setCurrentView(view)}
+        currentUser={currentUser}
+        onSwitchRole={handleSwitchRole}
+      />
 
-      {/* ============================================================== */}
-      {/* PAGE 2: DORAEMON'S HOUSE (MAIN SUBJECT WORLD)                  */}
-      {/* ============================================================== */}
-      {currentView === 'house' && (
-        <DoraemonHouseWorld
-          studentName={studentName || 'Student'}
-          courses={courses}
-          onSelectCourse={handleSelectSubject}
-          onAddSubject={handleAddSubject}
-          onDeleteCourse={handleDeleteCourse}
-          onOpenProfileSwitch={() => setCurrentView('welcome')}
-        />
-      )}
+      {/* Main View Router */}
+      <main className="flex-1 w-full">
+        {currentView === 'landing' && (
+          <LandingPage
+            onNavigate={(view) => setCurrentView(view)}
+            onEnterBuilding={handleEnterBuilding}
+          />
+        )}
 
-      {/* ============================================================== */}
-      {/* PAGE 3: INDIVIDUAL SUBJECT LEARNING WORLD & 3D UNIVERSE        */}
-      {/* ============================================================== */}
-      {currentView === 'subject' && selectedCourseDetail && (
-        <SubjectLearningWorld
-          courseDetail={selectedCourseDetail}
-          studentName={studentName || 'Student'}
-          onBackToHouse={() => setCurrentView('house')}
-          onReloadCourse={handleReloadCourse}
+        {currentView === 'explore-3d' && (
+          <ThreeCityScene
+            onEnterBuilding={handleEnterBuilding}
+            onSwitchToDashboard={() => setCurrentView('dashboard')}
+          />
+        )}
+
+        {currentView === 'dashboard' && (
+          <DashboardView
+            currentUser={currentUser}
+            courses={courses}
+            missions={missions}
+            onNavigate={(view) => setCurrentView(view)}
+            onEnterBuilding={handleEnterBuilding}
+            onClaimMission={handleClaimMission}
+            onOpenLesson={(courseId) => {
+              setCurrentView('knowledge-tower');
+            }}
+          />
+        )}
+
+        {currentView === 'knowledge-tower' && (
+          <KnowledgeTowerView
+            courses={courses}
+            onEnroll={handleEnrollCourse}
+            onCompleteLesson={handleCompleteLesson}
+            onViewCertificate={(courseTitle, certId) => setCertificateData({ courseTitle, certId })}
+          />
+        )}
+
+        {currentView === 'ai-hub' && <AiHubView />}
+
+        {currentView === 'challenge-arena' && <ChallengeArenaView quizzes={quizzes} />}
+
+        {currentView === 'digital-library' && (
+          <DigitalLibraryView
+            resources={resources}
+            onToggleBookmark={handleToggleBookmark}
+            onRefreshData={loadPlatformData}
+          />
+        )}
+
+        {currentView === 'experiment-lab' && <ExperimentLabView simulations={simulations} />}
+
+        {currentView === 'collaboration-centre' && (
+          <CollaborationCentreView
+            discussions={discussions}
+            studyGroups={studyGroups}
+            tasks={tasks}
+            onUpvoteDiscussion={handleUpvoteDiscussion}
+            onToggleJoinGroup={handleToggleJoinGroup}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+            onAddDiscussion={handleAddDiscussion}
+            onAddTask={handleAddTask}
+          />
+        )}
+
+        {currentView === 'progress-centre' && (
+          <ProgressCentreView
+            currentUser={currentUser}
+            missions={missions}
+            xpTransactions={xpTransactions}
+            onClaimMission={handleClaimMission}
+          />
+        )}
+
+        {currentView === 'instructor-portal' && (
+          <InstructorPortalView
+            currentUser={currentUser}
+            courses={courses}
+            onCourseCreated={loadPlatformData}
+          />
+        )}
+
+        {currentView === 'admin-portal' && (
+          <AdminPortalView currentUser={currentUser} />
+        )}
+      </main>
+
+      {/* Verifiable Certificate Modal */}
+      {certificateData && (
+        <CertificateModal
+          studentName={currentUser.name}
+          courseTitle={certificateData.courseTitle}
+          certificateId={certificateData.certId}
+          onClose={() => setCertificateData(null)}
         />
       )}
     </div>
   );
 };
-
-export default App;

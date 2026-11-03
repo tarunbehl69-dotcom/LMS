@@ -1,545 +1,527 @@
-import {
-  Course,
-  CourseDetail,
-  Lesson,
-  GamificationProfile,
-  Flashcard,
-  AnywhereDoorItem,
-  TutorMessage,
-  AppSettings,
-  QuizQuestion,
-  CourseSummaryData,
-  KnowledgeGraphData,
-  StudentProfile
-} from '../types';
-import { localStore } from './localLmsStore';
+/**
+ * API Service for LearnLoop Infinity 2.0.
+ * Connects to the FastAPI backend with seamless local resilience fallback.
+ */
+import { Course, UserProfile, Quiz, LibraryResource, Simulation, DiscussionThread, StudyGroup, KanbanTask, DailyMission, XPTransaction, LeaderboardUser } from '../types';
+import { localLms } from './localLmsStore';
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) || '/api';
+const BASE_URL = 'http://localhost:8000/api';
 
-const isJsonResponse = (res: Response): boolean => {
-  const ct = res.headers.get('content-type');
-  return res.ok && ct !== null && ct.includes('application/json');
-};
+async function safeFetch<T>(endpoint: string, options?: RequestInit, fallback?: () => T): Promise<T> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const resp = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers || {})
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      return await resp.json();
+    }
+  } catch (e) {
+    // Backend offline or timeout -> use local resilient store
+  }
+  if (fallback) {
+    return fallback();
+  }
+  throw new Error(`Failed to fetch from ${endpoint} and no fallback provided`);
+}
 
 export const api = {
-  // Courses
-  async getCourses(): Promise<Course[]> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses`);
-      if (isJsonResponse(res)) {
-        const backendCourses = await res.json();
-        if (Array.isArray(backendCourses)) {
-          // Merge with any local subjects
-          const localCourses = localStore.getCourses();
-          const combined = [...backendCourses];
-          localCourses.forEach((lc) => {
-            if (!combined.some((bc) => bc.id === lc.id)) {
-              combined.push(lc);
-            }
-          });
-          return combined;
+  // --- Profiles & Auth ---
+  getCurrentProfile: async (userId: string = 'usr_student_1'): Promise<UserProfile> => {
+    return safeFetch<UserProfile>(
+      `/gamification/profile?user_id=${userId}`,
+      undefined,
+      () => localLms.getCurrentUser()
+    );
+  },
+
+  switchRole: (role: 'student' | 'instructor' | 'admin'): UserProfile => {
+    return localLms.switchRole(role);
+  },
+
+  // --- Courses ---
+  getCourses: async (category?: string, search?: string): Promise<Course[]> => {
+    return safeFetch<Course[]>(
+      `/courses?category=${category || ''}&search=${search || ''}`,
+      undefined,
+      () => {
+        let list = localLms.getCourses();
+        if (category && category !== 'All') {
+          list = list.filter(c => c.category === category);
         }
+        if (search) {
+          const s = search.toLowerCase();
+          list = list.filter(c => c.title.toLowerCase().includes(s) || c.code.toLowerCase().includes(s));
+        }
+        return list;
       }
-    } catch {
-      // offline / standalone on Vercel
-    }
-    return localStore.getCourses();
+    );
   },
 
-  async getCourseDetail(courseId: string): Promise<CourseDetail> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}`);
-      if (isJsonResponse(res)) {
-        return await res.json();
+  getCourseDetail: async (courseId: string): Promise<Course> => {
+    return safeFetch<Course>(
+      `/courses/${courseId}`,
+      undefined,
+      () => {
+        const c = localLms.getCourses().find(item => item.id === courseId);
+        if (!c) throw new Error('Course not found');
+        return c;
       }
-    } catch {
-      // offline / standalone on Vercel
-    }
-    return localStore.getCourseDetail(courseId);
+    );
   },
 
-  async createSubject(title: string, description?: string): Promise<{ id: string; title: string; description: string }> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/subject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description }),
-      });
-      if (isJsonResponse(res)) {
-        const data = await res.json();
-        localStore.createSubject(title, description);
-        return data;
+  enrollInCourse: async (courseId: string) => {
+    return safeFetch(
+      `/courses/${courseId}/enroll`,
+      { method: 'POST' },
+      () => {
+        localLms.enrollInCourse(courseId);
+        return { status: 'success' };
       }
-    } catch {
-      // offline / standalone on Vercel
-    }
-    return localStore.createSubject(title, description);
+    );
   },
 
-  async uploadFiles(
-    files: File[],
-    subjectName?: string,
-    sessionTitle?: string,
-    targetCourseId?: string
-  ): Promise<{ message: string; courses: Course[] }> {
+  completeLesson: async (courseId: string, lessonId: string) => {
+    return safeFetch(
+      `/courses/${courseId}/lessons/${lessonId}/complete`,
+      { method: 'POST' },
+      () => {
+        return localLms.completeLesson(courseId, lessonId);
+      }
+    );
+  },
+
+  createCourse: async (course: any) => {
+    return safeFetch(
+      `/courses`,
+      { method: 'POST', body: JSON.stringify(course) },
+      () => {
+        return localLms.addCourse(course.code, course.title, course.category, course.difficulty, course.description);
+      }
+    );
+  },
+
+  // --- AI Mentor ---
+  chatWithMentor: async (message: string, courseContext?: string) => {
+    return safeFetch(
+      `/ai/chat`,
+      { method: 'POST', body: JSON.stringify({ message, course_context: courseContext }) },
+      () => {
+        localLms.addXP(10, 'Consulted Aegis AI Mentor');
+        const lower = message.toLowerCase();
+        let reply = '';
+        if (lower.includes('quantum')) {
+          reply = `### Quantum Superposition & Amplitude Mechanics\n\nA quantum state vector $|\\psi\\rangle$ exists in a Hilbert vector space as:\n\n$$|\\psi\\rangle = \\alpha |0\\rangle + \\beta |1\\rangle \\quad \\text{where } |\\alpha|^2 + |\\beta|^2 = 1$$\n\nQubits remain in simultaneous potentiality until measurement collapses the wave-function into an eigenstate.`;
+        } else if (lower.includes('attention') || lower.includes('transformer')) {
+          reply = `### Scaled Dot-Product Attention Equation\n\n$$\\text{Attention}(Q, K, V) = \\text{softmax}\\left( \\frac{QK^T}{\\sqrt{d_k}} \\right) V$$\n\nThe scaling term $\\sqrt{d_k}$ stabilizes variance in high dimensions.`;
+        } else {
+          reply = `### Academic Mentorship Response\n\nFor **"${message}"**, consider:\n1. Establishing the underlying system invariants.\n2. Quantifying error tolerances and algorithmic complexity $\\mathcal{O}(N)$.\n3. Applying empirical validation in the Experiment Lab!`;
+        }
+        return { reply, source: 'grounded-lms-engine', timestamp: 'Just now' };
+      }
+    );
+  },
+
+  summarizeText: async (text: string, title?: string) => {
+    return safeFetch(
+      `/ai/summarize`,
+      { method: 'POST', body: JSON.stringify({ text, document_title: title }) },
+      () => {
+        return {
+          document_title: title || 'Executive Study Summary',
+          summary: `## Executive Synthesis\n\n### 1. Key Principles\n- Core system constraints balance throughput and memory latency.\n- Gradient convergence scales at $\\mathcal{O}(1/\\sqrt{T})$.\n\n### 2. Actionable Focus Points\n- Verify boundary assertions in unit tests.\n- Benchmark against baseline architectures in the Challenge Arena.`,
+          word_count: text.split(' ').length
+        };
+      }
+    );
+  },
+
+  generateAiQuiz: async (topic: string, difficulty: string = 'Intermediate') => {
+    return safeFetch(
+      `/ai/quiz-generate`,
+      { method: 'POST', body: JSON.stringify({ topic, difficulty }) },
+      () => {
+        return {
+          topic,
+          difficulty,
+          questions: [
+            {
+              question: `What is the primary constraint when deploying ${topic} in production environments?`,
+              options: [
+                'Memory bandwidth and bus latency saturation',
+                'Unchecked single-threaded clock speed',
+                'Arbitrary packet loss with no retry buffer',
+                'Linear scaling of disk sectors'
+              ],
+              correct_index: 0,
+              explanation: 'High throughput AI and cloud workflows are typically constrained by memory bus bandwidth.'
+            },
+            {
+              question: `Which method optimizes convergence stability in ${topic}?`,
+              options: [
+                'AdamW optimizer with cosine learning rate annealing',
+                'Exhaustive combinatorial brute force',
+                'Elimination of regularization layers',
+                'Static single-batch evaluation'
+              ],
+              correct_index: 0,
+              explanation: 'Adaptive moment estimation with decoupled weight decay ensures robust convergence.'
+            }
+          ]
+        };
+      }
+    );
+  },
+
+  // --- Challenge Arena ---
+  getQuizzes: async (): Promise<Quiz[]> => {
+    return safeFetch<Quiz[]>(
+      `/arena/quizzes`,
+      undefined,
+      () => localLms.getStore().quizzes
+    );
+  },
+
+  getQuizDetail: async (quizId: string): Promise<Quiz> => {
+    return safeFetch<Quiz>(
+      `/arena/quizzes/${quizId}`,
+      undefined,
+      () => {
+        const q = localLms.getStore().quizzes.find(item => item.id === quizId);
+        if (!q) throw new Error('Quiz not found');
+        return q;
+      }
+    );
+  },
+
+  submitQuiz: async (quizId: string, answers: Record<string, number>) => {
+    return safeFetch(
+      `/arena/quizzes/${quizId}/submit`,
+      { method: 'POST', body: JSON.stringify({ answers }) },
+      () => {
+        const quiz = localLms.getStore().quizzes.find(item => item.id === quizId);
+        if (!quiz || !quiz.questions) throw new Error('Quiz not found');
+        let correct = 0;
+        const total = quiz.questions.length;
+        const breakdown = quiz.questions.map((q, idx) => {
+          const qid = q.id || `q${idx + 1}`;
+          const isCorrect = answers[qid] === q.correct_index;
+          if (isCorrect) correct++;
+          return {
+            question: q.question,
+            options: q.options,
+            user_choice: answers[qid],
+            correct_choice: q.correct_index,
+            is_correct: isCorrect,
+            explanation: q.explanation
+          };
+        });
+        const pct = Math.round((correct / total) * 100);
+        const passed = pct >= quiz.passing_score;
+        const xp = passed ? quiz.xp_reward : 30;
+        localLms.addXP(xp, `Completed Quiz: ${quiz.title}`);
+        return {
+          status: 'success',
+          score: correct,
+          total_questions: total,
+          percentage: pct,
+          passed,
+          xp_earned: xp,
+          breakdown
+        };
+      }
+    );
+  },
+
+  getLeaderboard: async (): Promise<LeaderboardUser[]> => {
+    return safeFetch<LeaderboardUser[]>(
+      `/arena/leaderboard`,
+      undefined,
+      () => [
+        { id: 'usr_admin_1', name: 'Director Elena Rostova', role: 'admin', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150', title: 'Dean of Academic Operations', total_xp: 5400, level: 6, current_streak: 42, rank: 1 },
+        { id: 'usr_instructor_1', name: 'Dr. Aris Thorne', role: 'instructor', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', title: 'Chair of Artificial Intelligence', total_xp: 3200, level: 6, current_streak: 18, rank: 2 },
+        { id: 'usr_u2', name: 'Prof. Mira Chen', role: 'instructor', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', title: 'Quantum Systems Lead', total_xp: 2950, level: 5, current_streak: 14, rank: 3 },
+        { id: 'usr_student_1', name: 'Alex Vance (You)', role: 'student', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', title: 'Cybernetics & AI Scholar', total_xp: localLms.getCurrentUser().total_xp, level: localLms.getCurrentUser().level, current_streak: 5, rank: 4 },
+        { id: 'usr_u4', name: 'Kaelen Rhee', role: 'student', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150', title: 'Deep Reinforcement Fellow', total_xp: 380, level: 2, current_streak: 4, rank: 5 }
+      ]
+    );
+  },
+
+  // --- Digital Library ---
+  getLibraryResources: async (category?: string, search?: string): Promise<LibraryResource[]> => {
+    return safeFetch<LibraryResource[]>(
+      `/library/resources?category=${category || ''}&search=${search || ''}`,
+      undefined,
+      () => {
+        let list = localLms.getStore().resources;
+        if (category && category !== 'All') {
+          list = list.filter(r => r.category === category);
+        }
+        if (search) {
+          const s = search.toLowerCase();
+          list = list.filter(r => r.title.toLowerCase().includes(s) || r.author.toLowerCase().includes(s));
+        }
+        return list;
+      }
+    );
+  },
+
+  toggleBookmark: async (resourceId: string): Promise<boolean> => {
+    return safeFetch(
+      `/library/resources/${resourceId}/bookmark`,
+      { method: 'POST' },
+      () => localLms.toggleBookmark(resourceId)
+    );
+  },
+
+  uploadResource: async (file: File, title: string, category: string, author: string = 'Alex Vance', description?: string) => {
     try {
       const formData = new FormData();
-      files.forEach((file) => formData.append('files', file));
-      if (subjectName && subjectName.trim()) formData.append('subject_name', subjectName.trim());
-      if (sessionTitle && sessionTitle.trim()) formData.append('session_title', sessionTitle.trim());
-      if (targetCourseId) formData.append('target_course_id', targetCourseId);
-      const res = await fetch(`${BASE_URL}/courses/upload`, {
+      formData.append('file', file);
+      formData.append('title', title);
+      formData.append('category', category);
+      formData.append('author', author);
+      if (description) formData.append('description', description);
+
+      const resp = await fetch('http://localhost:8000/api/library/upload', {
         method: 'POST',
-        body: formData,
+        body: formData
       });
-      if (isJsonResponse(res)) {
-        return await res.json();
+      if (resp.ok) {
+        const data = await resp.json();
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+        const newRes: LibraryResource = {
+          id: data.resource_id,
+          title,
+          author,
+          category,
+          file_type: (ext === 'pptx' || ext === 'ppt') ? 'slides' : 'pdf',
+          size_mb: data.size_mb || 1.5,
+          download_url: `/api/library/download/${data.resource_id}`,
+          cover_image: (ext === 'pptx' || ext === 'ppt') 
+            ? 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400' 
+            : 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
+          tags: [category, ext.toUpperCase(), `${data.unit_count || 1} ${data.unit_label || 'Units'}`],
+          views_count: 1,
+          downloads_count: 0,
+          description: description || `Study presentation for ${category}`,
+          content_preview: `Preview of uploaded ${file.name}. Contains ${data.unit_count || 1} ${data.unit_label || 'units'}.`,
+          is_user_uploaded: true,
+          is_bookmarked: false
+        };
+        localLms.addResource(newRes);
+        return { status: 'success', resource: newRes };
       }
-    } catch {
-      // offline / standalone on Vercel
+    } catch (e) {
+      console.warn('API upload fallback', e);
     }
-    return localStore.uploadFiles(files, subjectName, sessionTitle, targetCourseId);
-  },
-
-  async retryCourse(courseId: string): Promise<void> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}/retry`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to retry course processing');
-    } catch {
-      // fallback
-    }
-  },
-
-  async deleteCourse(courseId: string): Promise<void> {
-    localStore.deleteCourse(courseId);
-    try {
-      await fetch(`${BASE_URL}/courses/${courseId}`, { method: 'DELETE' });
-    } catch {
-      // ignore
-    }
-  },
-
-  async deleteMaterial(courseId: string, materialId?: string): Promise<void> {
-    localStore.deleteMaterial(courseId, materialId);
-    try {
-      const url = materialId 
-        ? `${BASE_URL}/courses/${courseId}/materials/${materialId}`
-        : `${BASE_URL}/courses/${courseId}/document`;
-      await fetch(url, { method: 'DELETE' });
-    } catch {
-      // ignore
-    }
-  },
-
-  async updateCourse(courseId: string, payload: { title?: string; description?: string }): Promise<void> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to update course');
-    } catch {
-      const detail = localStore.getCourseDetail(courseId);
-      if (payload.title) detail.title = payload.title;
-      if (payload.description) detail.description = payload.description;
-      localStore.saveCourseDetail(courseId, detail);
-    }
-  },
-
-  async updateSession(courseId: string, sessionId: string, payload: { title?: string; description?: string }): Promise<void> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}/sessions/${sessionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to update session');
-    } catch {
-      // fallback
-    }
-  },
-
-  async getCourseRawText(courseId: string): Promise<Array<{ unit_number: number; header: string; content: string }>> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}/raw-text`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return [
-      { unit_number: 1, header: 'Overview', content: 'Comprehensive course overview and introduction.' },
-    ];
-  },
-
-  async getCourseSummary(courseId: string): Promise<CourseSummaryData> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}/summary`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      id: `sum_${courseId}`,
-      course_id: courseId,
-      what_is_it_about: 'Fundamental principles and key real-world practices.',
-      main_topics: [
-        { title: 'Overview & Core Foundations', brief: 'Key conceptual building blocks' },
-        { title: 'Architectural Mechanics', brief: 'Detailed structural flow' },
-        { title: 'Implementation & Practical Trade-offs', brief: 'Real-world deployment considerations' }
-      ],
-      what_will_learn: ['Understand foundational systems', 'Analyze error handling and edge cases', 'Master high-yield exam concepts'],
-      important_concepts: ['Modularity', 'High Availability', 'Fault Tolerance'],
-      how_topics_connected: 'Each topic builds directly on the previous layer.',
-      connections: [],
-      understand_first: ['System fundamentals', 'Basic protocols'],
-      exam_points: ['Definitions', 'Core workflow diagrams', 'Real-world case studies'],
-      conclusion: 'Complete mastery of the course objectives.',
-      quick_summary: 'Fast high-level summary.',
-      detailed_summary: 'Comprehensive detailed breakdown.',
-      mermaid_syntax: 'graph TD\nA[Input]-->B[Engine]-->C[Output]',
-    };
-  },
-
-  async getCourseKnowledgeMap(courseId: string): Promise<KnowledgeGraphData> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/${courseId}/knowledge-map`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      nodes: [],
-      edges: [],
-      stats: { total_nodes: 0, total_edges: 0 }
-    };
-  },
-
-  async getAllLearningKnowledgeMap(): Promise<KnowledgeGraphData> {
-    try {
-      const res = await fetch(`${BASE_URL}/courses/knowledge-map/all`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      nodes: [],
-      edges: [],
-      stats: { total_nodes: 0, total_edges: 0 }
-    };
-  },
-
-  async createCourseManual(title: string, description?: string): Promise<{ message: string; course_id: string }> {
-    const sub = localStore.createSubject(title, description);
-    return { message: 'Course created', course_id: sub.id };
-  },
-
-  async addSession(courseId: string, title: string, description?: string): Promise<{ message: string; session_id: string }> {
-    const detail = localStore.getCourseDetail(courseId);
-    const newSession = {
-      id: `sess_${Date.now().toString(36)}`,
+    // Fallback local store
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+    const newRes: LibraryResource = {
+      id: `lib_res_${Date.now()}`,
       title,
-      order_index: detail.sessions?.length || 0,
-      description: description || '',
-      topics: [],
+      author,
+      category,
+      file_type: (ext === 'pptx' || ext === 'ppt') ? 'slides' : 'pdf',
+      size_mb: Number((file.size / (1024 * 1024)).toFixed(2)) || 2.5,
+      download_url: '#',
+      cover_image: (ext === 'pptx' || ext === 'ppt') 
+        ? 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400' 
+        : 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
+      tags: [category, ext.toUpperCase(), 'User Material'],
+      views_count: 1,
+      downloads_count: 0,
+      description: description || `Uploaded ${ext.toUpperCase()} study material for ${category}.`,
+      content_preview: `Academic material: ${title} (${category}). Extracted units ready for revision.`,
+      is_user_uploaded: true,
+      is_bookmarked: false
     };
-    detail.sessions = [...(detail.sessions || []), newSession];
-    localStore.saveCourseDetail(courseId, detail);
-    return { message: 'Session added', session_id: newSession.id };
+    localLms.addResource(newRes);
+    return { status: 'success', resource: newRes };
   },
 
-  async uploadSessionFile(courseId: string, sessionId: string, file: File): Promise<{ message: string; course_id: string; session_id: string; filename: string }> {
-    return { message: 'Uploaded', course_id: courseId, session_id: sessionId, filename: file.name };
-  },
-
-  async addTopic(courseId: string, sessionId: string, title: string, summary?: string, importance?: string): Promise<{ message: string; topic_id: string }> {
-    const detail = localStore.getCourseDetail(courseId);
-    const topicId = `${sessionId}_t${Date.now().toString(36)}`;
-    const newTopic = {
-      id: topicId,
-      title,
-      order_index: 0,
-      source_pages: [1],
-      summary: summary || 'Topic summary',
-      importance: (importance as any) || 'Medium',
-      is_completed: false,
-    };
-    const sess = detail.sessions?.find((s) => s.id === sessionId);
-    if (sess) {
-      sess.topics = [...(sess.topics || []), newTopic];
-    }
-    localStore.saveCourseDetail(courseId, detail);
-    localStore.seedLesson(topicId, title, detail.title, courseId, detail.title);
-    return { message: 'Topic added', topic_id: topicId };
-  },
-
-  // Lessons
-  async getLesson(topicId: string): Promise<Lesson> {
+  deleteResource: async (resourceId: string) => {
     try {
-      const res = await fetch(`${BASE_URL}/lessons/${topicId}`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.getLesson(topicId);
-  },
-
-  async completeLesson(topicId: string, courseId: string): Promise<{
-    success: boolean;
-    already_completed: boolean;
-    xp_awarded: number;
-    total_xp: number;
-    new_badge?: string;
-  }> {
-    try {
-      const res = await fetch(`${BASE_URL}/lessons/${topicId}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course_id: courseId }),
+      const resp = await fetch(`http://localhost:8000/api/library/resources/${resourceId}`, {
+        method: 'DELETE'
       });
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
+      if (resp.ok) {
+        localLms.removeResource(resourceId);
+        return { status: 'success' };
+      }
+    } catch (e) {
+      console.warn('API delete fallback', e);
     }
-    return {
-      success: true,
-      already_completed: false,
-      xp_awarded: 50,
-      total_xp: 500,
-      new_badge: 'Topic Master',
-    };
+    localLms.removeResource(resourceId);
+    return { status: 'success' };
   },
 
-  // Quizzes
-  async getQuiz(topicId: string): Promise<{
-    id: string;
-    topic_id: string;
-    course_id: string;
-    title: string;
-    topic_title: string;
-    questions: QuizQuestion[];
-  }> {
-    try {
-      const res = await fetch(`${BASE_URL}/quizzes/${topicId}`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.getQuiz(topicId);
+  // --- Experiment Lab ---
+  getSimulations: async (): Promise<Simulation[]> => {
+    return safeFetch<Simulation[]>(
+      `/lab/simulations`,
+      undefined,
+      () => localLms.getStore().simulations
+    );
   },
 
-  async submitQuiz(quizId: string, courseId: string, topicId: string, answers: number[]): Promise<{
-    score_percent: number;
-    correct_count: number;
-    total_questions: number;
-    xp_earned: number;
-    new_badge?: string;
-    weak_topic_status: string;
-    evaluation: Array<{
-      question_index: number;
-      question: string;
-      options: string[];
-      user_index: number;
-      correct_index: number;
-      is_correct: boolean;
-      explanation: string;
-    }>;
-  }> {
-    try {
-      const res = await fetch(`${BASE_URL}/quizzes/${quizId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course_id: courseId, topic_id: topicId, answers }),
-      });
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      score_percent: 100,
-      correct_count: answers.length,
-      total_questions: answers.length,
-      xp_earned: 100,
-      new_badge: 'Quiz Champion',
-      weak_topic_status: 'Mastered',
-      evaluation: answers.map((ans, idx) => ({
-        question_index: idx,
-        question: `Question ${idx + 1}`,
-        options: ['Correct Option', 'Option B', 'Option C'],
-        user_index: ans,
-        correct_index: ans,
-        is_correct: true,
-        explanation: 'Great job!',
-      })),
-    };
+  getSimulationDetail: async (simId: string): Promise<Simulation> => {
+    return safeFetch<Simulation>(
+      `/lab/simulations/${simId}`,
+      undefined,
+      () => {
+        const s = localLms.getStore().simulations.find(item => item.id === simId);
+        if (!s) throw new Error('Simulation not found');
+        return s;
+      }
+    );
   },
 
-  // Tutor
-  async sendTutorMessage(
-    message: string,
-    courseId?: string,
-    topicId?: string
-  ): Promise<{
-    reply: string;
-    citations: string[];
-    grounded_in_materials: boolean;
-    source_snippets: Array<{ citation: string; header: string; snippet: string }>;
-  }> {
-    try {
-      const res = await fetch(`${BASE_URL}/tutor/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, course_id: courseId, topic_id: topicId }),
-      });
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      reply: `Doraemon says: That's a great question about ${message}! In simple words: Break down the concept into small steps, review the flowchart diagram, and test yourself with the quiz to master it!`,
-      citations: ['Slide 1: Overview'],
-      grounded_in_materials: true,
-      source_snippets: [{ citation: 'Slide 1', header: 'Overview', snippet: 'Essential key concept.' }],
-    };
+  submitSimulation: async (simId: string, decisions: any[], finalMetrics: any) => {
+    return safeFetch(
+      `/lab/simulations/${simId}/submit`,
+      { method: 'POST', body: JSON.stringify({ decisions, final_metrics: finalMetrics }) },
+      () => {
+        localLms.addXP(150, 'Completed Experiment Lab Simulation');
+        return {
+          status: 'success',
+          score: 92,
+          xp_awarded: 150,
+          feedback: 'Exceptional system governance! You sustained high request throughput while keeping temperatures within cryogenic thresholds.'
+        };
+      }
+    );
   },
 
-  async getTutorHistory(courseId?: string, topicId?: string): Promise<TutorMessage[]> {
-    try {
-      const params = new URLSearchParams();
-      if (courseId) params.append('course_id', courseId);
-      if (topicId) params.append('topic_id', topicId);
-      const res = await fetch(`${BASE_URL}/tutor/history?${params.toString()}`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return [];
+  // --- Collaboration Centre ---
+  getDiscussions: async (channel?: string): Promise<DiscussionThread[]> => {
+    return safeFetch<DiscussionThread[]>(
+      `/collab/discussions?channel=${channel || ''}`,
+      undefined,
+      () => {
+        let list = localLms.getStore().discussions;
+        if (channel && channel !== 'all') {
+          list = list.filter(d => d.channel === channel);
+        }
+        return list;
+      }
+    );
   },
 
-  // Gadgets
-  async getAnywhereDoorDirectory(query: string = ''): Promise<AnywhereDoorItem[]> {
-    try {
-      const res = await fetch(`${BASE_URL}/gadgets/anywhere-door?q=${encodeURIComponent(query)}`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.getAnywhereDoorDirectory(query);
+  createDiscussion: async (channel: string, title: string, content: string, tags: string[]): Promise<DiscussionThread> => {
+    return safeFetch(
+      `/collab/discussions`,
+      { method: 'POST', body: JSON.stringify({ channel, title, content, tags }) },
+      () => localLms.addDiscussion(channel, title, content, tags)
+    );
   },
 
-  async getMemoryBreadCards(courseId?: string, topicId?: string): Promise<Flashcard[]> {
-    try {
-      const params = new URLSearchParams();
-      if (courseId) params.append('course_id', courseId);
-      if (topicId) params.append('topic_id', topicId);
-      const res = await fetch(`${BASE_URL}/gadgets/memory-bread?${params.toString()}`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.getMemoryBreadCards(courseId);
+  upvoteDiscussion: async (threadId: string) => {
+    return safeFetch(
+      `/collab/discussions/${threadId}/upvote`,
+      { method: 'POST' },
+      () => localLms.upvoteDiscussion(threadId)
+    );
   },
 
-  async getTimeMachineExam(courseId: string, durationMinutes: number = 15): Promise<any> {
-    try {
-      const res = await fetch(
-        `${BASE_URL}/gadgets/time-machine/exam?course_id=${encodeURIComponent(courseId)}&duration_minutes=${durationMinutes}`
-      );
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      exam_id: `exam_${Date.now()}`,
-      course_id: courseId,
-      title: 'Time Machine Mock Exam',
-      duration_minutes: durationMinutes,
-      total_questions: 2,
-      questions: [
-        {
-          question: 'What is the primary advantage of modular system architecture?',
-          options: ['Prevents single points of failure', 'Slows down processing', 'Eliminates memory', 'Offline only'],
-          correct_index: 0,
-          difficulty: 'Medium',
-          type: 'mcq',
-          explanation: 'Modularity creates independent fault-tolerant units.',
-        },
-      ],
-    };
+  getStudyGroups: async (): Promise<StudyGroup[]> => {
+    return safeFetch<StudyGroup[]>(
+      `/collab/groups`,
+      undefined,
+      () => localLms.getStore().groups
+    );
   },
 
-  // Gamification & Student Profiles
-  async getGamificationProfile(studentId?: string): Promise<GamificationProfile> {
-    try {
-      const url = studentId
-        ? `${BASE_URL}/gamification/profile?student_id=${encodeURIComponent(studentId)}`
-        : `${BASE_URL}/gamification/profile`;
-      const res = await fetch(url);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.getGamificationProfile(studentId);
+  toggleJoinGroup: async (groupId: string): Promise<boolean> => {
+    return safeFetch(
+      `/collab/groups/${groupId}/join`,
+      { method: 'POST' },
+      () => localLms.toggleGroup(groupId)
+    );
   },
 
-  async getStudentProfiles(): Promise<StudentProfile[]> {
-    try {
-      const res = await fetch(`${BASE_URL}/gamification/profiles`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return [localStore.createOrSwitchStudentProfile('Himani Tailor')];
+  getKanbanTasks: async (): Promise<KanbanTask[]> => {
+    return safeFetch<KanbanTask[]>(
+      `/collab/tasks`,
+      undefined,
+      () => localLms.getStore().tasks
+    );
   },
 
-  async createOrSwitchStudentProfile(name: string): Promise<StudentProfile> {
-    try {
-      const res = await fetch(`${BASE_URL}/gamification/profiles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return localStore.createOrSwitchStudentProfile(name);
+  updateTaskStatus: async (taskId: string, status: KanbanTask['status']) => {
+    return safeFetch(
+      `/collab/tasks/${taskId}`,
+      { method: 'PATCH', body: JSON.stringify({ status }) },
+      () => localLms.updateTaskStatus(taskId, status)
+    );
   },
 
-  async updateStudentProfileName(profileId: string, name: string): Promise<{ id: string; name: string }> {
-    localStore.createOrSwitchStudentProfile(name);
-    return { id: profileId, name };
+  createTask: async (groupId: string, title: string, assignee: string, priority: KanbanTask['priority']) => {
+    return safeFetch(
+      `/collab/tasks`,
+      { method: 'POST', body: JSON.stringify({ group_id: groupId, title, assignee, priority }) },
+      () => localLms.addTask(groupId, title, assignee, priority)
+    );
   },
 
-  // Settings
-  async getSettings(): Promise<AppSettings> {
-    try {
-      const res = await fetch(`${BASE_URL}/settings`);
-      if (isJsonResponse(res)) return res.json();
-    } catch {
-      // fallback
-    }
-    return {
-      is_configured: true,
-      masked_key: 'AIzaSy...DEMO',
-      active_provider: 'gemini',
-      model_name: 'gemini-1.5-flash',
-    };
+  // --- Gamification ---
+  getDailyMissions: async (): Promise<DailyMission[]> => {
+    return safeFetch<DailyMission[]>(
+      `/gamification/missions`,
+      undefined,
+      () => localLms.getStore().missions
+    );
   },
 
-  async updateSettings(settings: Partial<AppSettings & { gemini_api_key?: string }>): Promise<void> {
-    try {
-      await fetch(`${BASE_URL}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-    } catch {
-      // ignore
-    }
+  claimMission: async (missionId: string): Promise<number> => {
+    return safeFetch(
+      `/gamification/missions/${missionId}/claim`,
+      { method: 'POST' },
+      () => localLms.claimMission(missionId)
+    );
   },
 
-  async testConnection(): Promise<{ success: boolean; status: string; message: string }> {
-    return { success: true, status: 'connected', message: 'Ready' };
+  getXpTransactions: async (): Promise<XPTransaction[]> => {
+    return safeFetch<XPTransaction[]>(
+      `/gamification/transactions`,
+      undefined,
+      () => localLms.getStore().xpTransactions
+    );
   },
+
+  // --- Admin ---
+  getPlatformMetrics: async () => {
+    return safeFetch(
+      `/admin/metrics`,
+      undefined,
+      () => ({
+        total_users: 1420,
+        total_courses: localLms.getCourses().length,
+        total_quiz_attempts: 3890,
+        total_xp_awarded: 245000,
+        total_resources: localLms.getStore().resources.length,
+        system_status: 'Operational',
+        active_version: '2.0.4-quantum'
+      })
+    );
+  },
+
+  getAuditLogs: async () => {
+    return safeFetch(
+      `/admin/audit-logs`,
+      undefined,
+      () => [
+        { id: 'aud_1', actor_name: 'Director Elena Rostova', actor_role: 'admin', action: 'Curriculum Accreditation', details: 'Approved Course QC-302 Quantum Computing Syllabus', ip_address: '127.0.0.1', created_at: 'Today 09:30' },
+        { id: 'aud_2', actor_name: 'Dr. Aris Thorne', actor_role: 'instructor', action: 'Assessment Published', details: 'Added new quiz: Neural Attention & Latent Dynamics', ip_address: '127.0.0.1', created_at: 'Yesterday 14:15' },
+        { id: 'aud_3', actor_name: 'System Kernel', actor_role: 'system', action: 'Database Snapshot', details: 'Automated encrypted backup completed successfully', ip_address: '127.0.0.1', created_at: 'Nov 1, 2026' }
+      ]
+    );
+  }
 };

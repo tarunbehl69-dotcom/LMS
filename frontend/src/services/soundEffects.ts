@@ -1,161 +1,122 @@
 /**
- * Web Audio API Sound Synthesizer for Doremon's Learning World.
- * Generates charming cartoon and magical sound effects with zero external file dependencies.
- * Default is muted (soundEnabled = false) as requested.
+ * Futuristic Web Audio Synthesizer for LearnLoop Infinity 2.0.
+ * Zero external audio files required. Uses clean procedural oscillators.
  */
 
-class SoundEffectsManager {
+class SoundSynthesizer {
   private ctx: AudioContext | null = null;
-  private soundEnabled: boolean = false;
-
-  constructor() {
-    // Sound is OFF by default as requested
-    const saved = localStorage.getItem('doremon_sound_enabled');
-    this.soundEnabled = saved === 'true';
-  }
+  private isMuted: boolean = false;
 
   private getContext(): AudioContext | null {
-    if (!this.soundEnabled) return null;
-    if (!this.ctx) {
+    if (this.isMuted) return null;
+    if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
     return this.ctx;
   }
 
-  public isEnabled(): boolean {
-    return this.soundEnabled;
+  public toggleMute(): boolean {
+    this.isMuted = !this.isMuted;
+    return this.isMuted;
   }
 
-  public toggleSound(): boolean {
-    this.soundEnabled = !this.soundEnabled;
-    localStorage.setItem('doremon_sound_enabled', String(this.soundEnabled));
-    if (this.soundEnabled) {
-      this.playMagicChime();
-    }
-    return this.soundEnabled;
+  public getIsMuted(): boolean {
+    return this.isMuted;
   }
 
-  /**
-   * Magical sparkling chime when reaching into the 4D pocket
-   */
-  public playMagicChime(): void {
+  // Futuristic UI blip
+  public playClick() {
     const ctx = this.getContext();
     if (!ctx) return;
-
-    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98]; // C5, E5, G5, C6, E6, G6
-    notes.forEach((freq, idx) => {
+    try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.07);
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.05);
 
-      gain.gain.setValueAtTime(0, ctx.currentTime + idx * 0.07);
-      gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + idx * 0.07 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.07 + 0.35);
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(ctx.currentTime + idx * 0.07);
-      osc.stop(ctx.currentTime + idx * 0.07 + 0.4);
-    });
+      osc.start();
+      osc.stop(ctx.currentTime + 0.06);
+    } catch {}
   }
 
-  /**
-   * Success chime alias
-   */
-  public playSuccessChime(): void {
-    this.playMagicChime();
-  }
-
-  /**
-   * Cute cartoon pop sound when a topic gadget emerges
-   */
-  public playPopSound(): void {
+  // Warp / Teleport to building
+  public playWarp() {
     const ctx = this.getContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
-
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  }
-
-  /**
-   * Joyful celebration fanfare when completing a lesson or quiz
-   */
-  public playCelebrateFanfare(): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
-
-    const chords = [
-      { f: 523.25, t: 0.0 }, // C5
-      { f: 659.25, t: 0.12 }, // E5
-      { f: 783.99, t: 0.24 }, // G5
-      { f: 1046.50, t: 0.36 }, // C6
-      { f: 1318.51, t: 0.52 }, // E6 held
-    ];
-
-    chords.forEach(({ f, t }, idx) => {
+    try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.25);
 
-      osc.type = idx === chords.length - 1 ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(f, ctx.currentTime + t);
-
-      const duration = idx === chords.length - 1 ? 0.7 : 0.2;
-      gain.gain.setValueAtTime(0.12, ctx.currentTime + t);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + duration);
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + duration + 0.05);
-    });
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {}
   }
 
-  /**
-   * Soft marimba tap on buttons
-   */
-  public playClickSound(): void {
+  // Quiz Success / Achievement Unlocked
+  public playSuccess() {
     const ctx = this.getContext();
     if (!ctx) return;
+    try {
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        const startTime = ctx.currentTime + idx * 0.08;
+        gain.gain.setValueAtTime(0.05, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.28);
+      });
+    } catch {}
+  }
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(600, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.06);
+  // Level Up Fanfare
+  public playLevelUp() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    try {
+      const freqs = [440, 554.37, 659.25, 880, 1108.73, 1318.51];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const startTime = ctx.currentTime + idx * 0.09;
+        gain.gain.setValueAtTime(0.06, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
 
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.4);
+      });
+    } catch {}
   }
 }
 
-export const sounds = new SoundEffectsManager();
+export const sounds = new SoundSynthesizer();

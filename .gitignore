@@ -26,6 +26,8 @@ htmlcov/
 backend/uploads/*
 !backend/uploads/.gitkeep
 *.log
+*.db
+legacy_archive/
 
 # OS & Editor files
 .DS_Store

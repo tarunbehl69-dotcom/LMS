@@ -1,307 +1,282 @@
+/**
+ * TypeScript Type Definitions for LearnLoop Infinity 2.0.
+ * Full type coverage across 3D navigation, 7 university sectors, gamification, and role-based portals.
+ */
+
+export type UserRole = 'student' | 'instructor' | 'admin';
+
+export type AppView = 
+  | 'landing'
+  | 'explore-3d'
+  | 'dashboard'
+  | 'knowledge-tower'
+  | 'ai-hub'
+  | 'challenge-arena'
+  | 'digital-library'
+  | 'experiment-lab'
+  | 'collaboration-centre'
+  | 'progress-centre'
+  | 'instructor-portal'
+  | 'admin-portal';
+
+export type BuildingId = 
+  | 'knowledge-tower'
+  | 'ai-hub'
+  | 'challenge-arena'
+  | 'digital-library'
+  | 'experiment-lab'
+  | 'collaboration-centre'
+  | 'progress-centre';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar: string;
+  title: string;
+  bio: string;
+  total_xp: number;
+  level: number;
+  current_streak: number;
+  last_active_date?: string;
+  interests?: string[];
+  enrolledCourses?: string[];
+  badges?: string[];
+}
+
 export interface Course {
   id: string;
+  code: string;
   title: string;
+  category: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  duration_hours: number;
+  rating: number;
+  enrolled_count: number;
+  instructor_id?: string;
+  instructor_name: string;
   description: string;
-  filename: string;
-  file_type: 'pptx' | 'pdf';
-  status: 'uploading' | 'reading' | 'identifying' | 'generating' | 'ready' | 'error';
-  status_message?: string;
-  progress_percent: number;
-  total_units: number;
-  topic_count: number;
-  completed_topics_count: number;
-  created_at: string;
+  thumbnail: string;
+  is_published?: number | boolean;
+  is_enrolled?: boolean;
+  user_progress?: number;
+  certificate_id?: string | null;
+  modules?: CourseModule[];
 }
 
-export interface Topic {
-  id: string;
-  title: string;
-  order_index: number;
-  source_pages: number[];
-  summary: string;
-  importance: 'Overview' | 'High' | 'Medium' | 'Low';
-  is_completed: boolean;
-}
-
-export interface Session {
-  id: string;
-  title: string;
-  order_index: number;
-  description: string;
-  topics: Topic[];
-}
-
-export interface CoverageItem {
-  unit_number: number;
-  unit_label: string;
-  title: string;
-  topic_assigned: string;
-  session_name: string;
-  status: string;
-  extracted_items: {
-    paragraphs_count: number;
-    bullets_count: number;
-    tables_count: number;
-    has_notes: boolean;
-  };
-}
-
-export interface CourseMaterial {
+export interface CourseModule {
   id: string;
   course_id: string;
-  session_id?: string;
-  filename: string;
-  file_type: 'pptx' | 'pdf';
   title: string;
-  total_units: number;
-  topic_count: number;
-  status: string;
-  created_at?: string;
+  order_index: number;
+  description?: string;
+  lessons: Lesson[];
 }
 
-export interface CourseDetail extends Course {
-  sessions: Session[];
-  coverage_checklist: CoverageItem[];
-  materials?: CourseMaterial[];
-}
-
-export interface StepItem {
-  step: number;
-  heading: string;
-  description: string;
-}
-
-export interface IndianExample {
-  title?: string;
-  company: string;
-  scenario: string;
-  takeaway: string;
-}
-
-export interface RealLifeExample {
+export interface LessonResource {
   title: string;
-  scenario: string;
-  learning: string;
-}
-
-export interface TermItem {
-  term: string;
-  definition: string;
-}
-
-export interface FormulaItem {
-  formula: string;
-  variables: string;
-  solved_example: string;
-}
-
-export interface DiagramData {
-  mermaid_syntax?: string;
-  diagram_type?: string;
-  explanation?: string;
-}
-
-export interface ComparisonTableItem {
-  feature: string;
-  item_a_val: string;
-  item_b_val: string;
-}
-
-export interface ComparisonData {
-  item_a?: string;
-  item_b?: string;
-  comparison_table?: ComparisonTableItem[];
-}
-
-export interface QuestionQA {
-  question: string;
-  answer?: string;
-  guideline?: string;
-}
-
-export interface QuizQuestion {
-  question: string;
-  options: string[];
-  correct_index: number;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  type: 'mcq' | 'true_false' | 'short';
-  explanation: string;
+  url: string;
+  type?: string;
 }
 
 export interface Lesson {
   id: string;
-  topic_id: string;
+  module_id: string;
   course_id: string;
-  course_title: string;
   title: string;
-  importance: string;
-  unit_label: string;
-  source_pages: number[];
-  simple_definition: string;
-  easy_english: string;
-  hinglish: string;
-  step_by_step: StepItem[];
-  key_points: string[];
-  real_life_examples: RealLifeExample[];
-  indian_examples: IndianExample[];
-  terminology: TermItem[];
-  formulas: FormulaItem[];
-  diagram: DiagramData;
-  comparisons: ComparisonData;
-  exam_notes: string;
-  short_questions: QuestionQA[];
-  long_questions: QuestionQA[];
-  revision_summary: string;
-  simplified_mode: {
-    title?: string;
-    eli5_text?: string;
-    gadget_tip?: string;
-  };
-  is_completed: boolean;
-}
-
-export interface Badge {
-  name: string;
-  description: string;
-  icon: string;
-}
-
-export interface WeakTopic {
-  topic_id: string;
-  topic_title: string;
-  course_id: string;
-  last_score: number;
-  date: string;
-  status: string;
-}
-
-export interface GamificationProfile {
-  student_name?: string;
-  student_id?: string;
-  total_xp: number;
-  level: number;
-  xp_in_current_level: number;
-  next_level_xp: number;
-  current_streak: number;
-  completed_topics_count: number;
-  completed_topics: string[];
-  weak_topics: WeakTopic[];
-  badges: string[];
-  available_badges: Badge[];
-}
-
-export interface Flashcard {
-  id: string;
-  topic_title: string;
-  course_title: string;
-  source_ref: string;
-  card_type: 'Definition' | 'Term' | 'Formula';
-  front: string;
-  back: string;
-}
-
-export interface AnywhereDoorItem {
-  course_id: string;
-  course_title: string;
-  file_type: string;
-  session_id: string;
-  session_title: string;
-  topic_id: string;
-  topic_title: string;
-  source_pages: number[];
-  importance: string;
-  is_completed: boolean;
-}
-
-export interface SourceSnippet {
-  citation: string;
-  header: string;
-  snippet: string;
-}
-
-export interface TutorMessage {
-  id: string;
-  role: 'user' | 'tutor';
-  content: string;
-  citations?: string[];
-  source_snippets?: SourceSnippet[];
-  created_at?: string;
-}
-
-export interface AppSettings {
-  is_configured: boolean;
-  masked_key: string;
-  active_provider: string;
-  model_name: string;
-}
-
-export interface CourseSummaryData {
-  id: string;
-  course_id: string;
-  what_is_it_about: string;
-  main_topics: Array<{ title: string; brief: string }>;
-  what_will_learn: string[];
-  important_concepts: string[];
-  how_topics_connected: string;
-  connections: Array<{ from_topic: string; to_topic: string; relation_type: string; explanation: string }>;
-  understand_first: string[];
-  exam_points: string[];
-  conclusion: string;
-  quick_summary: string;
-  detailed_summary: string;
-  mermaid_syntax: string;
-}
-
-export interface GraphNode {
-  id: string;
-  label: string;
-  full_label?: string;
-  type: 'chapter' | 'topic' | 'subtopic';
-  course_id: string;
-  course_title: string;
-  session_id?: string;
-  session_title?: string;
-  parent_topic_id?: string;
-  color: string;
-  size: number;
-  importance?: string;
-  summary?: string;
-  description?: string;
+  order_index: number;
+  lesson_type: 'video' | 'reading' | 'interactive';
+  duration_minutes: number;
+  video_url?: string;
+  content_markdown: string;
+  resources?: LessonResource[];
   is_completed?: boolean;
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
 }
 
-export interface GraphEdge {
-  source: string;
-  target: string;
-  relation_type: string;
-  label: string;
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
   explanation: string;
 }
 
-export interface KnowledgeGraphData {
+export interface Quiz {
+  id: string;
   course_id?: string;
-  course_title?: string;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  stats: {
-    total_nodes: number;
-    total_edges: number;
-    chapters_count?: number;
-    topics_count?: number;
-    courses_count?: number;
-  };
+  title: string;
+  description: string;
+  category: string;
+  difficulty: 'Novice' | 'Intermediate' | 'Master';
+  time_limit_minutes: number;
+  passing_score: number;
+  xp_reward: number;
+  questions?: QuizQuestion[];
 }
 
-export interface StudentProfile {
+export interface QuizAttempt {
+  id: string;
+  quiz_id: string;
+  quiz_title: string;
+  score: number;
+  total_questions: number;
+  percentage: number;
+  passed: boolean;
+  xp_earned: number;
+  completed_at: string;
+  breakdown?: any[];
+}
+
+export interface LeaderboardUser {
   id: string;
   name: string;
+  role: string;
+  avatar: string;
+  title: string;
   total_xp: number;
   level: number;
   current_streak: number;
-  completed_topics_count: number;
+  rank: number;
+}
+
+export interface LibraryResource {
+  id: string;
+  title: string;
+  author: string;
+  category: string;
+  file_type: 'pdf' | 'slides' | 'paper' | 'code' | 'video';
+  size_mb: number;
+  download_url?: string;
+  cover_image: string;
+  tags: string[];
+  views_count: number;
+  downloads_count: number;
+  description: string;
+  content_preview?: string;
+  is_bookmarked?: boolean;
+  is_user_uploaded?: boolean;
+  file_path?: string;
+}
+
+export interface SimulationPhaseChoice {
+  text: string;
+  delta: Record<string, number>;
+}
+
+export interface SimulationPhase {
+  name: string;
+  scenario: string;
+  choices: SimulationPhaseChoice[];
+}
+
+export interface SimulationScenarioData {
+  initial_metrics: Record<string, number>;
+  phases: SimulationPhase[];
+}
+
+export interface Simulation {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  duration_minutes: number;
+  difficulty: string;
+  xp_reward: number;
+  scenario_data?: SimulationScenarioData;
+}
+
+export interface DiscussionThread {
+  id: string;
+  channel: string;
+  title: string;
+  content: string;
+  author_id: string;
+  author_name: string;
+  author_role: UserRole;
+  upvotes: number;
+  replies_count: number;
+  tags: string[];
+  is_pinned?: number | boolean;
   created_at: string;
+}
+
+export interface StudyGroup {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  leader_id: string;
+  leader_name: string;
+  member_count: number;
+  max_members: number;
+  schedule: string;
+  tags: string[];
+  is_joined?: boolean;
+}
+
+export interface KanbanTask {
+  id: string;
+  group_id: string;
+  title: string;
+  description?: string;
+  assignee: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'todo' | 'inprogress' | 'review' | 'completed';
+  due_date?: string;
+  created_at?: string;
+}
+
+export interface DailyMission {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  xp_reward: number;
+  target_count: number;
+  current_count: number;
+  is_claimed: boolean | number;
+  mission_date: string;
+}
+
+export interface XPTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface Achievement {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  xp_value: number;
+  is_unlocked: boolean;
+  unlocked_at?: string;
+  requirement: string;
+}
+
+export interface AuditLog {
+  id: string;
+  actor_id: string;
+  actor_name: string;
+  actor_role: string;
+  action: string;
+  details: string;
+  ip_address: string;
+  created_at: string;
+}
+
+export interface PlatformMetrics {
+  total_users: number;
+  total_courses: number;
+  total_quiz_attempts: number;
+  total_xp_awarded: number;
+  total_resources: number;
+  system_status: string;
+  active_version: string;
 }

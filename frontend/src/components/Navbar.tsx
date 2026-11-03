@@ -1,195 +1,326 @@
 import React, { useState } from 'react';
-import {
+import { AppView, BuildingId, UserProfile, UserRole } from '../types';
+import { 
+  Compass, 
+  LayoutDashboard, 
+  BookOpen, 
+  Brain, 
+  Swords, 
+  Library, 
+  FlaskConical, 
+  Users, 
+  Trophy, 
+  Bell, 
+  ShieldCheck, 
+  GraduationCap, 
+  Briefcase, 
+  ChevronDown,
   Sparkles,
   Flame,
-  Key,
-  Plus,
-  Volume2,
-  VolumeX,
-  Settings,
-  BookOpen,
-  Layers,
-  User,
-  UploadCloud,
-  Network
+  CheckCircle2
 } from 'lucide-react';
-import { GamificationProfile } from '../types';
 import { sounds } from '../services/soundEffects';
 
-export type NavigationTab =
-  | 'home'
-  | 'courses'
-  | 'upload'
-  | 'materials'
-  | 'learn'
-  | 'knowledge-map'
-  | 'quiz-revision'
-  | 'quiz'
-  | 'revision'
-  | 'progress'
-  | 'settings';
-
 interface NavbarProps {
-  profile: GamificationProfile | null;
-  activeTab: NavigationTab;
-  studentName: string;
-  onSelectTab: (tab: NavigationTab) => void;
-  onOpenUpload: () => void;
-  onOpenSettings: () => void;
-  onToggleTutor: () => void;
-  onGoHome: () => void;
-  onOpenStudentLogin: () => void;
+  currentView: AppView;
+  onNavigate: (view: AppView) => void;
+  currentUser: UserProfile;
+  onSwitchRole: (role: UserRole) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  profile,
-  activeTab,
-  studentName,
-  onSelectTab,
-  onOpenUpload,
-  onOpenSettings,
-  onToggleTutor,
-  onGoHome,
-  onOpenStudentLogin,
+  currentView,
+  onNavigate,
+  currentUser,
+  onSwitchRole
 }) => {
-  const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
+  const [showRoleDropdown, setShowRoleDropdown] = useState<boolean>(false);
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
 
-  const handleToggleSound = () => {
-    const newState = sounds.toggleSound();
-    setSoundEnabled(newState);
+  const notifications = [
+    { id: 1, text: 'New lesson unlocked in Neuromorphic AI', time: '10m ago', unread: true },
+    { id: 2, text: 'Weekly Challenge Arena Leaderboard resets in 2 days', time: '1h ago', unread: true },
+    { id: 3, text: 'Alex, you earned +150 XP from Simulation completion!', time: '2h ago', unread: false }
+  ];
+
+  const handleNavClick = (view: AppView) => {
+    sounds.playClick();
+    onNavigate(view);
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-2 border-sky-100 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
-        {/* Brand with Exact Doraemon Avatar */}
-        <div 
-          onClick={onGoHome}
-          className="flex items-center gap-2.5 cursor-pointer group select-none"
+    <header className="sticky top-0 z-50 w-full h-16 glass-panel border-b border-cyan-500/20 bg-slate-950/90 flex items-center justify-between px-4 lg:px-6">
+      {/* Brand & Logo */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => handleNavClick('landing')}
+          className="flex items-center gap-2.5 text-left group transition-all"
         >
-          <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-[#0288D1] to-[#29B6F6] p-1 flex items-center justify-center shadow-sm shadow-sky-200 group-hover:scale-105 transition-transform duration-200 border-2 border-white">
-            <img
-              src="/doraemon_reference.png"
-              alt="Doraemon"
-              className="w-8 h-8 object-contain drop-shadow"
-            />
-            {/* Sparkle badge */}
-            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-yellow-400 border border-white flex items-center justify-center text-[8px]">
-              ✨
-            </div>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.4)] group-hover:scale-105 transition-all">
+            <Sparkles className="w-5 h-5 text-slate-950 fill-white" />
           </div>
-
           <div>
-            <div className="flex items-center gap-1">
-              <span className="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-[#0288D1] via-[#0277BD] to-[#01579B] bg-clip-text text-transparent">
-                Doremon's
+            <div className="text-base font-extrabold tracking-wider bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-1.5">
+              <span>LEARNLOOP</span>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono">
+                2.0
               </span>
-              <span className="font-black text-lg sm:text-xl text-[#E53935] tracking-tight">3D</span>
-              <span className="font-bold text-lg sm:text-xl text-slate-800 tracking-tight">World</span>
             </div>
-            <p className="text-[10px] text-sky-700 font-semibold hidden sm:block">
-              AI-Powered 3D LMS with 4D Pocket
-            </p>
+            <div className="text-[10px] text-slate-400 tracking-tight hidden sm:block">
+              Your Learning Journey. A Whole New Universe.
+            </div>
           </div>
+        </button>
+      </div>
+
+      {/* Main Sector Navigation Links (Desktop) */}
+      <nav className="hidden xl:flex items-center gap-1">
+        <button
+          onClick={() => handleNavClick('explore-3d')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'explore-3d'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+              : 'text-slate-300 hover:text-cyan-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Compass className="w-4 h-4 text-cyan-400" />
+          <span>3D City</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('dashboard')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'dashboard'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+              : 'text-slate-300 hover:text-cyan-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4 text-blue-400" />
+          <span>Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('knowledge-tower')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'knowledge-tower'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+              : 'text-slate-300 hover:text-cyan-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          <span>Courses</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('ai-hub')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'ai-hub'
+              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
+              : 'text-slate-300 hover:text-purple-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Brain className="w-4 h-4 text-purple-400" />
+          <span>AI Mentor</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('challenge-arena')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'challenge-arena'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+              : 'text-slate-300 hover:text-amber-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Swords className="w-4 h-4 text-amber-400" />
+          <span>Arena</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('digital-library')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'digital-library'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+              : 'text-slate-300 hover:text-emerald-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Library className="w-4 h-4 text-emerald-400" />
+          <span>Library</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('experiment-lab')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'experiment-lab'
+              ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40 shadow-[0_0_12px_rgba(236,72,153,0.2)]'
+              : 'text-slate-300 hover:text-pink-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <FlaskConical className="w-4 h-4 text-pink-400" />
+          <span>Simulations</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('collaboration-centre')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'collaboration-centre'
+              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
+              : 'text-slate-300 hover:text-blue-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Users className="w-4 h-4 text-blue-400" />
+          <span>Collab</span>
+        </button>
+
+        <button
+          onClick={() => handleNavClick('progress-centre')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            currentView === 'progress-centre'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+              : 'text-slate-300 hover:text-cyan-300 hover:bg-slate-800/60'
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-cyan-400" />
+          <span>Progress</span>
+        </button>
+      </nav>
+
+      {/* Right Controls: Role Switcher & User Profile */}
+      <div className="flex items-center gap-3">
+        {/* Streak Counter */}
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold" title="Current Study Streak">
+          <Flame className="w-4 h-4 fill-amber-400 text-amber-400 animate-pulse" />
+          <span>{currentUser.current_streak}d</span>
         </div>
 
-        {/* Center: Personalized Student Badge & Gamification Stats */}
-        <div className="hidden md:flex items-center gap-2.5">
-          {/* 3D Mode Pill */}
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[11px] font-black shadow-xs">
-            <span>✨</span>
-            <span>3D Learning LMS</span>
-          </span>
-
-          {/* Personalized Student Profile Pill */}
-          <button
-            onClick={onOpenStudentLogin}
-            title="Click to Switch Student Profile or Change Name"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-950 text-xs font-black transition-all cursor-pointer shadow-2xs hover:scale-102"
-          >
-            <span className="text-sm">🎒</span>
-            <span className="font-extrabold">{studentName || 'Himani'}</span>
-            <span className="text-[9px] px-1 py-0.5 rounded-md bg-sky-200 text-sky-900 font-bold">
-              Switch
-            </span>
-          </button>
-
-          {/* Streak Counter */}
-          <div 
-            title="Daily Study Streak"
-            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 text-xs font-black shadow-2xs"
-          >
-            <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
-            <span>{profile?.current_streak || 1}d</span>
+        {/* Level & XP Chip */}
+        <div 
+          onClick={() => handleNavClick('progress-centre')}
+          className="cursor-pointer hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-900 border border-cyan-500/30 hover:border-cyan-400 transition-all text-xs"
+        >
+          <div className="flex flex-col text-right">
+            <span className="text-[10px] text-cyan-400 font-semibold uppercase">Lvl {currentUser.level}</span>
+            <span className="font-mono text-white font-bold">{currentUser.total_xp} XP</span>
           </div>
-
-          {/* XP & Level Badge */}
-          <div 
-            title="Total XP & Progress"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs font-black shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#FFD600] fill-[#FFD600]" />
-            <span>Lv. {profile?.level || 1}</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-sky-700">{profile?.total_xp || 0} XP</span>
-          </div>
+          <div className="w-2 h-2 rounded-full bg-cyan-400" />
         </div>
 
-        {/* Right Actions: Sound Switch, AI Tutor, Settings, Upload */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
-          {/* Mobile Student Profile Button */}
+        {/* Role Switcher Pill (Student / Instructor / Admin) */}
+        <div className="relative">
           <button
-            onClick={onOpenStudentLogin}
-            className="md:hidden p-1.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-xs font-black"
-            title="Switch Student Profile"
+            onClick={() => {
+              sounds.playClick();
+              setShowRoleDropdown(!showRoleDropdown);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-purple-500/40 hover:border-purple-400 text-xs font-medium text-purple-300 transition-all shadow-[0_0_10px_rgba(139,92,246,0.15)]"
           >
-            <span>🎒 {studentName || 'Himani'}</span>
+            {currentUser.role === 'student' && <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />}
+            {currentUser.role === 'instructor' && <Briefcase className="w-3.5 h-3.5 text-blue-400" />}
+            {currentUser.role === 'admin' && <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />}
+            <span className="capitalize font-semibold">{currentUser.role} View</span>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
 
-          {/* Royalty-free Sound ON/OFF switch */}
+          {showRoleDropdown && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl glass-panel-purple border border-purple-500/30 shadow-2xl p-1.5 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="text-[10px] text-slate-400 font-semibold px-2 py-1 uppercase tracking-wider">
+                Switch Active Role
+              </div>
+              <button
+                onClick={() => {
+                  onSwitchRole('student');
+                  setShowRoleDropdown(false);
+                  onNavigate('explore-3d');
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between text-left transition-all ${
+                  currentUser.role === 'student' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-cyan-400" />
+                  <span>Student Portal</span>
+                </div>
+                {currentUser.role === 'student' && <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />}
+              </button>
+
+              <button
+                onClick={() => {
+                  onSwitchRole('instructor');
+                  setShowRoleDropdown(false);
+                  onNavigate('instructor-portal');
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between text-left transition-all ${
+                  currentUser.role === 'instructor' ? 'bg-blue-500/20 text-blue-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-blue-400" />
+                  <span>Instructor Studio</span>
+                </div>
+                {currentUser.role === 'instructor' && <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />}
+              </button>
+
+              <button
+                onClick={() => {
+                  onSwitchRole('admin');
+                  setShowRoleDropdown(false);
+                  onNavigate('admin-portal');
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between text-left transition-all ${
+                  currentUser.role === 'admin' ? 'bg-purple-500/20 text-purple-300 font-bold' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>Admin Console</span>
+                </div>
+                {currentUser.role === 'admin' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Notifications Button */}
+        <div className="relative">
           <button
-            onClick={handleToggleSound}
-            title={soundEnabled ? 'Sound is ON (Click to Mute)' : 'Sound is OFF (Click to Enable Magical Chimes)'}
-            className={`p-2 rounded-xl border transition-all cursor-pointer ${
-              soundEnabled
-                ? 'bg-sky-100 border-sky-300 text-sky-900 shadow-xs'
-                : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-700'
-            }`}
+            onClick={() => {
+              sounds.playClick();
+              setShowNotifications(!showNotifications);
+            }}
+            className="p-2 rounded-xl glass-panel text-slate-300 hover:text-cyan-300 transition-all relative"
           >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-sky-700" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400" />
           </button>
 
-          {/* AI Teacher Toggle */}
-          <button
-            onClick={onToggleTutor}
-            title="Ask Doremon's AI Teacher"
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all hover:scale-102 cursor-pointer shadow-2xs"
-          >
-            <span className="text-sm">🤖</span>
-            <span className="hidden sm:inline">AI Tutor</span>
-          </button>
+          {showNotifications && (
+            <div className="absolute right-0 mt-2 w-72 rounded-xl glass-panel-glow border border-cyan-500/30 p-3 shadow-2xl z-50">
+              <div className="text-xs font-bold text-white mb-2 flex items-center justify-between">
+                <span>Campus Alerts</span>
+                <span className="text-[10px] text-cyan-400">Mark all read</span>
+              </div>
+              <div className="space-y-2">
+                {notifications.map((n) => (
+                  <div key={n.id} className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                    <p className="text-slate-200">{n.text}</p>
+                    <span className="text-[10px] text-slate-500">{n.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-          {/* Settings Tab Button */}
-          <button
-            onClick={() => onSelectTab('settings')}
-            title="Settings & API Configuration"
-            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
-                : 'text-slate-500 hover:text-sky-600 hover:bg-sky-50 border-slate-200'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Prominent Upload Button */}
-          <button
-            onClick={onOpenUpload}
-            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm text-white bg-gradient-to-r from-[#0288D1] via-[#03A9F4] to-[#29B6F6] hover:from-[#0277BD] hover:to-[#0288D1] shadow-md shadow-sky-300/40 hover:shadow-sky-400/50 transition-all hover:-translate-y-0.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[3]" />
-            <span>+ Upload PPT / PDF</span>
-          </button>
+        {/* User Avatar */}
+        <div 
+          onClick={() => handleNavClick('progress-centre')}
+          className="cursor-pointer relative"
+        >
+          <img
+            src={currentUser.avatar}
+            alt={currentUser.name}
+            className="w-8 h-8 rounded-full border-2 border-cyan-400/80 object-cover shadow-[0_0_10px_rgba(0,240,255,0.3)]"
+          />
         </div>
       </div>
     </header>
